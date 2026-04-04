@@ -1,0 +1,19 @@
+{
+  "buildCommand": "next build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "headers": [
+    {
+      "source": "/api/notifications",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-transform" },
+        { "key": "Connection", "value": "keep-alive" },
+        { "key": "Content-Type", "value": "text/event-stream" },
+        { "key": "X-Accel-Buffering", "value": "no" }
+      ]
+    }
+  ]
+}

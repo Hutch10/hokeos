@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HokeOS v1.6.1: Industrial Recovery Ledger
 
-## Getting Started
+HokeOS is a mission-critical recovery platform built for industrial batch settlement auditing, anomaly detection, and predictive market forecasting. It bridges the gap between raw analytical data and sovereign accounting.
 
-First, run the development server:
+## High-Fidelity Infrastructure
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Autonomous Resilience**: Real-time batch trust monitoring with automated triage triggers.
+- **Auditing & Reporting**: Advanced resolution accuracy reporting and month-over-month ROI visualization.
+- **Predictive Intelligence**: 7-day settlement risk forecasting backed by a linear regression volatility engine.
+- **Unified Notifications**: Hardened SSE infrastructure with a 30s heartbeat pulse and automated Slack/Email external bridges.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Technology Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Frontend**: Next.js 16.2.1 (App Router), Lucide-React symbols.
+- **Backend**: Next.js Edge Functions & Server Actions.
+- **Persistence**: Drizzle ORM (Postgres), Neon database backend.
+- **Security**: Next-Auth (v4), Bcrypt, strict multi-tenant team isolation.
+- **Intelligence**: OpenAI (v6) calibration loops and custom predictive statistical logic.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Operation & Deployment
 
-## Learn More
+Refer to the **[OPERATIONAL_RUNBOOK.md](./OPERATIONAL_RUNBOOK.md)** for detailed guides on:
+- Triage & Investigation resolution.
+- Market price ingestion.
+- Production Vercel orchestration.
+- Deployment pre-flight validations.
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+**Hoke Recovery Systems**
+*v1.6.1 Professional Deployment Certification*

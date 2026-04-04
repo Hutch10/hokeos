@@ -1,0 +1,18 @@
+export {
+  acceptInvite,
+  assertTeamMember,
+  changeMemberRole,
+  createTeam,
+  ensurePersonalTeam,
+  getTeamMembership,
+  getUserTeams,
+  inviteByEmail,
+  listTeamInvites,
+  listTeamMembers,
+  removeMember,
+  renameTeam,
+  resolveActiveTeamId,
+  setActiveTeam,
+  type TeamRole,
+  type TeamSummary,
+} from "./service";
