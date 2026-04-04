@@ -4,7 +4,6 @@ import {
   getBatchService, 
   getBillingService 
 } from '@/lib/mock-data-gate';
-import { ActionToast } from "@/components/ui/action-toast";
 import { requireCurrentUser } from "@/lib/auth";
 import {
   batchApiResponseSchema,
@@ -144,7 +143,7 @@ export default async function BatchDetailPage({ params }: PageProps) {
       </Card>
 
 
-      <ActionToast />
+      
     </div>
   );
 }
