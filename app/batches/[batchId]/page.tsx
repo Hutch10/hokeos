@@ -1,6 +1,4 @@
-'use client';
-
-import React, { use } from 'react';
+import React from 'react';
 import { notFound } from 'next/navigation';
 import { 
   getBatchService, 
@@ -29,16 +27,15 @@ interface PageProps {
   params: Promise<{ batchId: string }>;
 }
 
-export default function BatchDetailPage({ params }: PageProps) {
-  const { batchId } = use(params);
+export default async function BatchDetailPage({ params }: PageProps) {
+  const { batchId } = await params;
   
-  // requireCurrentUser() would be used here in a real production environment
+  const user = await requireCurrentUser();
   
-  // FIX: Removed arguments from service getters to match mock-data-gate signature
   const batchService = getBatchService();
   const billingService = getBillingService();
 
-  const batch = batchService.getBatchById(batchId);
+  const batch = await batchService.getBatchById(batchId, user.id);
 
   if (!batch) {
     notFound();
@@ -56,23 +53,27 @@ export default function BatchDetailPage({ params }: PageProps) {
         </Link>
       </div>
 
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-3xl font-bold tracking-tight">{batch.name}</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Batch {batch.id.slice(0, 8)}</h1>
             <Badge variant={batch.status === 'completed' ? 'default' : 'secondary'}>
               {batch.status.toUpperCase()}
             </Badge>
           </div>
+
           <p className="text-muted-foreground">
             Batch ID: <span className="font-mono">{batchId}</span> • Created on {new Date(batch.createdAt).toLocaleDateString()}
           </p>
         </div>
+
         <div className="flex gap-3">
           <Button variant="outline" className="gap-2">
             <FileText className="h-4 w-4" />
             Export Report
           </Button>
+
           <Button className="gap-2">
             <Beaker className="h-4 w-4" />
             Run Analysis
@@ -80,34 +81,40 @@ export default function BatchDetailPage({ params }: PageProps) {
         </div>
       </div>
 
+
       <div className="grid gap-6 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Volume</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
+
           <CardContent>
-            <div className="text-2xl font-bold">{batch.volume} kg</div>
-            <p className="text-xs text-muted-foreground">+2.1% from last batch</p>
+            <div className="text-2xl font-bold">${batch.totalNetValue.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Net value</p>
           </CardContent>
         </Card>
+
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Purity Grade</CardTitle>
             <Beaker className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
+
           <CardContent>
-            <div className="text-2xl font-bold">{batch.purity}%</div>
-            <p className="text-xs text-muted-foreground">Within industrial tolerance</p>
+            <div className="text-2xl font-bold">{batch.trustScore || 'N/A'}</div>
+            <p className="text-xs text-muted-foreground">Trust Score</p>
           </CardContent>
         </Card>
+
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">System Health</CardTitle>
             <AlertCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
+
           <CardContent>
             <div className="text-2xl font-bold">Nominal</div>
             <p className="text-xs text-muted-foreground">All sensors operational</p>
@@ -115,15 +122,18 @@ export default function BatchDetailPage({ params }: PageProps) {
         </Card>
       </div>
 
+
       <Card className="mt-8">
         <CardHeader>
           <CardTitle>Batch Composition Details</CardTitle>
         </CardHeader>
+
         <CardContent>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Detailed breakdown of the chemical and metallurgical properties for batch {batchId}.
             </p>
+
             <div className="rounded-md border p-4 bg-muted/50">
               <pre className="text-xs font-mono whitespace-pre-wrap">
                 {JSON.stringify(batch, null, 2)}
@@ -132,6 +142,7 @@ export default function BatchDetailPage({ params }: PageProps) {
           </div>
         </CardContent>
       </Card>
+
 
       <ActionToast />
     </div>

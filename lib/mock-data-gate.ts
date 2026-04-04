@@ -1,14 +1,15 @@
 // Mock data gate - returns real services when mock mode is disabled
+// This file is SERVER-ONLY - do not import from client components
 export const isMockEnabled = () => false;
 
-// ─── Service Imports ──────────────────────────────────────────────────────────
+// ─── Service Exports ──────────────────────────────────────────────────────────
+// These functions are used by Server Components only
+
 import * as batchService from "@/lib/metals/batch-service";
 import * as billingService from "@/lib/billing/service";
 import * as investigationService from "@/lib/investigations/service";
 import * as reportService from "@/lib/reports/schedule-service";
 import * as tagService from "@/lib/tags/tag-service";
-
-// ─── Service Exports (factory pattern for dependency injection) ───────────────
 
 export function getBatchService(_mock?: boolean) {
   return batchService;
