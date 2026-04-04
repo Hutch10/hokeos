@@ -1,1 +1,1 @@
-﻿export const isMockEnabled = () => false;
+export const isMockEnabled = () => false;
