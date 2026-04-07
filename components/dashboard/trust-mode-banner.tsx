@@ -84,7 +84,19 @@ export function TrustModeBanner({
       textColor: "text-cyan-100",
       description: "LITEENGINE (SQLITE) SECURE. Data is persisting locally on this hardware. Zero-secret industrial persistence verified."
     }
-  }[status];
+  }[status] || {
+    bg: "bg-zinc-800 border-zinc-700",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-500">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="8" x2="12" y2="12" />
+        <line x1="12" y1="16" x2="12.01" y2="16" />
+      </svg>
+    ),
+    label: "Unknown Trust Status",
+    textColor: "text-zinc-400",
+    description: "The system is operating in an unverified state. Please contact technical audit."
+  };
 
   return (
     <div className={cn(

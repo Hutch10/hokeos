@@ -134,22 +134,53 @@ export default async function DashboardPage({
 }) {
   const params = (await searchParams) ?? {};
   const user = await requireCurrentUser();
+  if (!user || !user.activeTeamId) {
+    throw new Error("SYSTEM_IDENTITY_BREACH: Active session missing critical team telemetry.");
+  }
+  
   const isMockRequested = params.mock === "true";
   
   const batchService = await getBatchService(isMockRequested);
   const lotService = await getLotService(isMockRequested);
   const billingService = await getBillingService(isMockRequested);
-  const priceService = await getPriceService(isMockRequested).catch((e) => { console.error("PriceService Init Failed", e); return null; });
-  const investigationService = await getInvestigationService(isMockRequested).catch((e) => { console.error("InvestigationService Init Failed", e); return null; });
+  const priceService = await getPriceService(isMockRequested).catch((e) => { 
+    console.error("PriceService Init Failed", e); 
+    return null; 
+  });
+  const investigationService = await getInvestigationService(isMockRequested).catch((e) => { 
+    console.error("InvestigationService Init Failed", e); 
+    return null; 
+  });
 
-  const [billing, marketOverview, forecastOverview, recentInvestigations, rawBatches, rawLots] = await Promise.all([
-    billingService.getBillingSummary(user.activeTeamId).catch(() => ({ record: {} as any, teamId: user.activeTeamId, plan: "free" as const, status: "active" as const, definition: { label: "Free", batchLimit: 10, exportsEnabled: false, comparisonEnabled: false, prioritySupport: false, customLimits: false }, batchCount: 0, remainingBatches: 10, canCreateBatch: true, canExport: false, canCompare: false })),
-    priceService ? priceService.getMarketOverview().catch(() => []) : Promise.resolve([]),
-    priceService ? priceService.getForecastOverview().catch(() => []) : Promise.resolve([]),
-    investigationService ? investigationService.listInvestigations(user.activeTeamId).catch((err: any) => { console.warn("Investigations failed:", err?.message); return []; }) : Promise.resolve([]),
-    batchService.listBatches(user.id).catch(() => []),
-    lotService.listLots(user.activeTeamId).catch(() => []),
-  ]);
+  let data;
+  try {
+    data = await Promise.all([
+      billingService.getBillingSummary(user.activeTeamId).catch(() => ({ 
+        id: "fallback",
+        record: {} as any, 
+        teamId: user.activeTeamId, 
+        plan: "free" as const, 
+        status: "active" as const, 
+        definition: { label: "Free Recovery", batchLimit: 10, exportsEnabled: false, comparisonEnabled: false, prioritySupport: false, customLimits: false }, 
+        batchCount: 0, 
+        remainingBatches: 10, 
+        canCreateBatch: true, 
+        canExport: false, 
+        canCompare: false 
+      })),
+      priceService ? priceService.getMarketOverview().catch(() => []) : Promise.resolve([]),
+      priceService ? priceService.getForecastOverview().catch(() => []) : Promise.resolve([]),
+      investigationService ? investigationService.listInvestigations(user.activeTeamId).catch((err: any) => { console.warn("Investigations failed:", err?.message); return []; }) : Promise.resolve([]),
+      batchService.listBatches(user.id).catch(() => []),
+      lotService.listLots(user.activeTeamId).catch(() => []),
+    ]);
+  } catch (renderingError: any) {
+    console.error("CRITICAL COCKPIT RENDER FAILURE:", renderingError);
+    // Bypass Next.js masking for Alpha Pilot auditing
+    throw new Error(`SYSTEM_PROTOCOL_BREACH_SIGNATURE: ${renderingError.message || "Unknown Failure"} | STACK: ${renderingError.stack?.slice(0, 500) || "No Stack"}`);
+  }
+
+  const [billing, marketOverview, forecastOverview, recentInvestigations, rawBatches, rawLots] = data;
 
   const filters = parseFilterState(params);
 
@@ -190,14 +221,18 @@ export default async function DashboardPage({
     })
     .filter((entry): entry is FilteredBatchForCharts => entry !== null);
 
-  const items = filteredBatches.flatMap((entry) => entry.items);
+  const items = filteredBatches.flatMap((entry) => entry.items ?? []);
   const totalBatches = filteredBatches.length;
   const totalLots = (rawLots || []).length;
-  const totalRecoveredMetal = items.reduce((sum, item) => sum + item.recoveredMetalWeight, 0);
-  const totalGrossValue = items.reduce((sum, item) => sum + item.grossValue, 0) + (rawLots || []).reduce((sum: number, lot: any) => sum + Number(lot.roi?.revenue ?? 0), 0);
-  const totalNetValue = items.reduce((sum, item) => sum + item.netValue, 0) + (rawLots || []).reduce((sum: number, lot: any) => sum + Number(lot.roi?.revenue ?? 0), 0);
-  const totalProfitLoss = items.reduce((sum, item) => sum + item.profitLoss, 0) + (rawLots || []).reduce((sum: number, lot: any) => sum + Number(lot.roi?.profit ?? 0), 0);
-  const marginValues = [...items.map(i => i.marginPct), ...(rawLots || []).map((l: any) => l.roi?.marginPct ? Number(l.roi.marginPct) : null)].filter((m): m is number => m !== null);
+  const totalRecoveredMetal = items.reduce((sum, item) => sum + (item.recoveredMetalWeight ?? 0), 0);
+  const totalGrossValue = items.reduce((sum, item) => sum + (item.grossValue ?? 0), 0) + (rawLots || []).reduce((sum: number, lot: any) => sum + Number(lot.roi?.revenue ?? 0), 0);
+  const totalNetValue = items.reduce((sum, item) => sum + (item.netValue ?? 0), 0) + (rawLots || []).reduce((sum: number, lot: any) => sum + Number(lot.roi?.revenue ?? 0), 0);
+  const totalProfitLoss = items.reduce((sum, item) => sum + (item.profitLoss ?? 0), 0) + (rawLots || []).reduce((sum: number, lot: any) => sum + Number(lot.roi?.profit ?? 0), 0);
+  const marginValues = [
+    ...items.map(i => i.marginPct), 
+    ...(rawLots || []).map((l: any) => l.roi?.marginPct ? Number(l.roi.marginPct) : null)
+  ].filter((m): m is number => m !== null && Number.isFinite(m));
+  
   const averageMarginPct = marginValues.length > 0 ? marginValues.reduce((s, m) => s + m, 0) / marginValues.length : null;
 
   const metalMap = new Map<string, MetalBreakdownRow>();
@@ -214,10 +249,11 @@ export default async function DashboardPage({
 
   const tagSummaryMap = new Map<string, { id: string; name: string; color: string | null; batchCount: number; totalNetValue: number; totalProfitLoss: number }>();
   for (const entry of filteredBatches) {
-    const batchNet = entry.items.reduce((sum, item) => sum + item.netValue, 0);
-    const batchProfitLoss = entry.items.reduce((sum, item) => sum + item.profitLoss, 0);
+    const batchNet = entry.items.reduce((sum, item) => sum + (item.netValue ?? 0), 0);
+    const batchProfitLoss = entry.items.reduce((sum, item) => sum + (item.profitLoss ?? 0), 0);
     for (const tag of (entry.batch.tags ?? [])) {
-      const current = tagSummaryMap.get(tag.id) ?? { id: tag.id, name: tag.name, color: tag.color ?? null, batchCount: 0, totalNetValue: 0, totalProfitLoss: 0 };
+      if (!tag || !tag.id) continue;
+      const current = tagSummaryMap.get(tag.id) ?? { id: tag.id, name: tag.name || "Unnamed Tag", color: tag.color ?? null, batchCount: 0, totalNetValue: 0, totalProfitLoss: 0 };
       current.batchCount += 1;
       current.totalNetValue += batchNet;
       current.totalProfitLoss += batchProfitLoss;
