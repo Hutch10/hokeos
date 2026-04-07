@@ -15,26 +15,28 @@ function normalizeDatabaseUrl(url: string | undefined): string | undefined {
   return url.replace(/[?&]channel_binding=[^&]*/g, "").replace(/\?&/, "?").replace(/\?$/, "");
 }
 
+// 1. Initial Identity & Mode Configuration
 const normalizedUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
+export const PERSISTENCE_MODE = (normalizedUrl && !normalizedUrl.includes("postgres:postgres@localhost"))
+  ? "LIVE"
+  : "SOVEREIGN";
 
-const schema = (normalizedUrl && !normalizedUrl.includes("postgres:postgres@localhost")) 
-  ? schemaPg 
-  : schemaSqlite;
+const schema = PERSISTENCE_MODE === "LIVE" ? schemaPg : schemaSqlite;
 
-// Path for Sovereign Local Persistence
+// Path for Sovereign Local Persistence (Only applicable in non-Vercel environments)
 const SQLITE_DB_PATH = path.join(process.cwd(), "hokeos_sovereign.db");
 
 function createDb() {
   const isVercel = process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
   const databaseUrl = normalizedUrl;
 
-  // 1. Try PostgreSQL (Production/Cloud)
+  // Try PostgreSQL (Production/Cloud)
   if (databaseUrl && !databaseUrl.includes("postgres:postgres@localhost")) {
     try {
       if (isVercel) {
-        return drizzleHttp(neon(databaseUrl), { schema });
+        return drizzleHttp(neon(databaseUrl), { schema: schema as any });
       }
-      return drizzleNode(new Pool({ connectionString: databaseUrl }), { schema });
+      return drizzleNode(new Pool({ connectionString: databaseUrl }), { schema: schema as any });
     } catch (err: any) {
       console.warn(`PostgreSQL connection failed: ${err?.message}. Failing over to mock services.`);
     }
@@ -42,7 +44,7 @@ function createDb() {
 
   // 2. Sovereign Local Persistence (SQLite) - ONLY IN NON-VERCEL/NON-PROD
   // Native modules like better-sqlite3 cause crashes in Vercel serverless.
-  if (!isVercel && (PERSISTENCE_MODE === "SOVEREIGN" || !databaseUrl)) {
+  if (!isVercel && PERSISTENCE_MODE === "SOVEREIGN") {
     try {
       // Dynamic import to avoid static bundling of native module in serverless
       const DatabaseConstructor = require("better-sqlite3");
@@ -60,6 +62,3 @@ function createDb() {
 }
 
 export const db = createDb();
-export const PERSISTENCE_MODE = (normalizedUrl && !normalizedUrl.includes("postgres:postgres@localhost"))
-  ? "LIVE"
-  : "SOVEREIGN";

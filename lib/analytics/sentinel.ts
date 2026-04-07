@@ -35,6 +35,16 @@ export const Sentinel = {
   },
 
   /**
+   * Records a system-level failure for diagnostic auditing.
+   */
+  recordFailure(error: any) {
+    METRICS.fallbackTriggerCount++;
+    (METRICS as any).lastError = error?.message || "Unknown Failure";
+    (METRICS as any).lastErrorStack = error?.stack?.slice(0, 500) || "No Stack Trace";
+    console.error(`\u001b[31m[Sentinel] System Failure Recorded: ${(METRICS as any).lastError}\u001b[0m`);
+  },
+
+  /**
    * Checks if a trust-layer feature is enabled.
    */
   isFeatureEnabled(flag: keyof typeof FEATURE_FLAGS): boolean {

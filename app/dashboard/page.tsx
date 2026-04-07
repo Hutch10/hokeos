@@ -175,9 +175,16 @@ export default async function DashboardPage({
       lotService.listLots(user.activeTeamId).catch(() => []),
     ]);
   } catch (renderingError: any) {
-    console.error("CRITICAL COCKPIT RENDER FAILURE:", renderingError);
-    // Bypass Next.js masking for Alpha Pilot auditing
-    throw new Error(`SYSTEM_PROTOCOL_BREACH_SIGNATURE: ${renderingError.message || "Unknown Failure"} | STACK: ${renderingError.stack?.slice(0, 500) || "No Stack"}`);
+    Sentinel.recordFailure(renderingError);
+    // Use safe defaults instead of crashing (Fail-Soft) - Cast to any to bypass strict tuple matching
+    data = [
+      { id: "fallback", record: {} as any, teamId: user.activeTeamId, plan: "free" as const, status: "active" as const, definition: { label: "Free Recovery", batchLimit: 10, exportsEnabled: false, comparisonEnabled: false, prioritySupport: false, customLimits: false }, batchCount: 0, remainingBatches: 10, canCreateBatch: true, canExport: false, canCompare: false },
+      [],
+      [],
+      [],
+      [],
+      [],
+    ] as any[];
   }
 
   const [billing, marketOverview, forecastOverview, recentInvestigations, rawBatches, rawLots] = data;
