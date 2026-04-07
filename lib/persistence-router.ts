@@ -103,8 +103,14 @@ function isDatabaseError(err: Error | unknown): boolean {
 
   if (patterns.some(p => message.includes(p))) return true;
 
+  // Phase 16: Absolute Fallback Support
+  // Handle cases where the 'db' instance was initialized as null due to driver failure.
+  if (message.includes("NULL") || message.includes("UNDEFINED") || message.includes("OF NULL")) {
+    return true;
+  }
+
   // In production, be more aggressive about catching database errors
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
     // Check for common neon/postgres error patterns
     if (
       message.includes("DATABASE") ||
@@ -172,7 +178,7 @@ function createResilientService<T extends ServiceShape>(real: T, mock: T, servic
             try {
               // We use a detached insertion to avoid blocking the fallback UI
               const teamIdHeader = (await headers().catch(() => null))?.get("x-hoke-team-id");
-              if (teamIdHeader) {
+              if (teamIdHeader && db) {
                 await db.insert(systemTelemetry).values({
                   teamId: teamIdHeader,
                   serviceName,

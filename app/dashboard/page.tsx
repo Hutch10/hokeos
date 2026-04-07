@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import { DashboardMetricCard } from "@/components/dashboard/dashboard-metric-card";
 import { FilterBar } from "@/components/dashboard/filter-bar";
@@ -137,14 +139,14 @@ export default async function DashboardPage({
   const batchService = await getBatchService(isMockRequested);
   const lotService = await getLotService(isMockRequested);
   const billingService = await getBillingService(isMockRequested);
-  const priceService = await getPriceService(isMockRequested);
-  const investigationService = await getInvestigationService(isMockRequested);
+  const priceService = await getPriceService(isMockRequested).catch((e) => { console.error("PriceService Init Failed", e); return null; });
+  const investigationService = await getInvestigationService(isMockRequested).catch((e) => { console.error("InvestigationService Init Failed", e); return null; });
 
   const [billing, marketOverview, forecastOverview, recentInvestigations, rawBatches, rawLots] = await Promise.all([
     billingService.getBillingSummary(user.activeTeamId).catch(() => ({ record: {} as any, teamId: user.activeTeamId, plan: "free" as const, status: "active" as const, definition: { label: "Free", batchLimit: 10, exportsEnabled: false, comparisonEnabled: false, prioritySupport: false, customLimits: false }, batchCount: 0, remainingBatches: 10, canCreateBatch: true, canExport: false, canCompare: false })),
-    priceService.getMarketOverview().catch(() => []),
-    priceService.getForecastOverview().catch(() => []),
-    investigationService.listInvestigations(user.activeTeamId).catch((err: Error) => { console.warn("Investigations failed:", err.message); return []; }),
+    priceService ? priceService.getMarketOverview().catch(() => []) : Promise.resolve([]),
+    priceService ? priceService.getForecastOverview().catch(() => []) : Promise.resolve([]),
+    investigationService ? investigationService.listInvestigations(user.activeTeamId).catch((err: any) => { console.warn("Investigations failed:", err?.message); return []; }) : Promise.resolve([]),
     batchService.listBatches(user.id).catch(() => []),
     lotService.listLots(user.activeTeamId).catch(() => []),
   ]);
@@ -225,7 +227,7 @@ export default async function DashboardPage({
   const tagSummary = Array.from(tagSummaryMap.values()).sort((a, b) => b.batchCount !== a.batchCount ? b.batchCount - a.batchCount : b.totalNetValue - a.totalNetValue);
 
   const chartData = buildChartData({ filteredBatches, lots: rawLots || [] });
-  const monthlySummary: MonthlySummaryRow[] = [...chartData.monthlySeries].map((p) => ({ month: p.period, totalRecoveredMetal: p.recoveredMetalWeight, totalNetValue: p.netValue, totalProfitLoss: p.profitLoss, averageMarginPct: p.averageMarginPct })).sort((a, b) => b.month.localeCompare(a.month));
+  const monthlySummary: MonthlySummaryRow[] = (chartData?.monthlySeries || []).map((p) => ({ month: p.period, totalRecoveredMetal: p.recoveredMetalWeight, totalNetValue: p.netValue, totalProfitLoss: p.profitLoss, averageMarginPct: p.averageMarginPct })).sort((a, b) => b.month.localeCompare(a.month));
   const heatmapPoints: HeatmapPoint[] = filteredBatches.map((entry) => ({ id: entry.batch.id, netValue: entry.items.reduce((s, i) => s + i.netValue, 0), marginPct: entry.items.reduce((s, i) => s + i.netValue, 0) > 0 ? (entry.items.reduce((s, i) => s + i.profitLoss, 0) / entry.items.reduce((s, i) => s + i.netValue, 0)) * 100 : 0, confidenceScore: entry.batch.auditSnapshot?.confidence?.score ?? 100, metalType: entry.items[0]?.metalType ?? "unknown", isDegraded: entry.batch.auditSnapshot?.confidence?.degradedMode ?? false }));
 
   return (
