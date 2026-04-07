@@ -44,7 +44,7 @@ export async function listRecentReports(userId: string, limit = 5): Promise<Rece
     .orderBy(desc(reports.createdAt))
     .limit(Math.max(1, Math.min(limit, 25)));
 
-  return rows.map((row) => ({
+  return (rows as any[]).map((row) => ({
     id: row.id,
     userId: row.userId,
     teamId: row.teamId,

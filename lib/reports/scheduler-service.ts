@@ -87,10 +87,10 @@ async function processSingleSchedule(schedule: ReportScheduleRow): Promise<{ sta
     }
 
     const report = schedule.type === "melt"
-      ? await generateMeltSheet(batch)
+      ? await generateMeltSheet(batch as any)
       : schedule.type === "settlement"
-        ? await generateSettlementSheet(batch)
-        : await generateAssayReport(batch);
+        ? await generateSettlementSheet(batch as any)
+        : await generateAssayReport(batch as any);
 
     await sendReportEmail(user, report.pdf, {
       reportType: schedule.type,

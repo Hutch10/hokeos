@@ -101,7 +101,7 @@ export async function listReportSchedules(userId: string): Promise<ReportSchedul
     .orderBy(asc(reportSchedules.nextRunAt), asc(reportSchedules.createdAt));
 
   const enriched = await Promise.all(
-    rows.map(async (row) => ({
+    (rows as any[]).map(async (row) => ({
       id: row.id,
       userId: row.userId,
       teamId: row.teamId,
@@ -250,7 +250,7 @@ export async function listDueSchedules(now = new Date(), limit = 50): Promise<Re
     .limit(Math.max(1, Math.min(limit, 500)));
 
   const result = await Promise.all(
-    rows.map(async (row) => ({
+    (rows as any[]).map(async (row) => ({
       id: row.id,
       userId: row.userId,
       teamId: row.teamId,

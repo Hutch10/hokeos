@@ -16,14 +16,14 @@ function normalizeTagName(name: string): string {
   return name.trim().replace(/\s+/g, " ");
 }
 
-export async function listTags(userId: string, teamId: string): Promise<TagRecord[]> {
+export async function listTags(teamId: string): Promise<TagRecord[]> {
   const rows = await db
     .select()
     .from(tags)
-    .where(and(eq(tags.userId, userId), eq(tags.teamId, teamId)))
+    .where(eq(tags.teamId, teamId))
     .orderBy(tags.name);
 
-  return rows.map((row) => ({
+  return (rows as any[]).map((row) => ({
     id: row.id,
     userId: row.userId,
     teamId: row.teamId,
@@ -133,7 +133,7 @@ export async function assignTagsToBatch(
     throw new Error("One or more tags were not found");
   }
 
-  await db.transaction(async (tx) => {
+  await db.transaction(async (tx: any) => {
     await tx
       .delete(batchTags)
       .where(and(eq(batchTags.batchId, batchId), eq(batchTags.userId, userId)));
@@ -149,7 +149,7 @@ export async function assignTagsToBatch(
   });
 
   return tagRows
-    .map((row) => ({
+    .map((row: any) => ({
       id: row.id,
       userId: row.userId,
       teamId: row.teamId,
@@ -157,7 +157,7 @@ export async function assignTagsToBatch(
       color: row.color ?? null,
       createdAt: row.createdAt,
     }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a: any, b: any) => a.name.localeCompare(b.name));
 }
 
 export async function getTagsForBatch(batchId: string, userId: string): Promise<TagRecord[]> {
@@ -177,7 +177,7 @@ export async function getTagsForBatch(batchId: string, userId: string): Promise<
     .where(and(eq(batchTags.batchId, batchId), eq(batchTags.userId, userId), eq(tags.userId, userId)))
     .orderBy(tags.name);
 
-  return rows.map((row) => ({
+  return (rows as any[]).map((row) => ({
     id: row.id,
     userId: row.userId,
     teamId: row.teamId,

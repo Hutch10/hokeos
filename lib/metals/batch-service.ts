@@ -392,6 +392,9 @@ function itemResultFromRow(
     marginPct: 100,
     recoveryRatePct: 100,
     currency: "USD",
+    isHardwareVerified: false,
+    hasAnomaly: false,
+    confidenceBands: null,
   };
 }
 
@@ -609,7 +612,7 @@ export async function updateBatch(
   const totalProfitLoss = calculatedItems.reduce((s, i) => s.plus(i.profitLoss), new Decimal(0));
   const totalAcquisitionCost = calculatedItems.reduce((s, i) => s.plus(i.acquisitionCostUsd), new Decimal(0));
 
-  await db.transaction(async (tx) => {
+  await db.transaction(async (tx: any) => {
     await tx
       .update(batches)
       .set({
@@ -731,7 +734,7 @@ export async function listBatches(userId: string, options?: ListBatchOptions): P
       .from(batchTags)
       .where(and(eq(batchTags.userId, userId), inArray(batchTags.tagId, normalizedTagIds)));
 
-    const batchIds = Array.from(new Set(matches.map((row) => row.batchId)));
+    const batchIds = Array.from(new Set((matches as { batchId: string }[]).map((row) => row.batchId)));
 
     if (batchIds.length === 0) {
       return [];
@@ -740,7 +743,7 @@ export async function listBatches(userId: string, options?: ListBatchOptions): P
     rows = await db
       .select()
       .from(batches)
-      .where(and(eq(batches.userId, userId), inArray(batches.id, batchIds)))
+      .where(and(eq(batches.userId, userId), inArray(batches.id, batchIds as string[])))
       .orderBy(desc(batches.createdAt));
   }
 
@@ -802,7 +805,7 @@ export async function listItemsForBatch(
       }
     : null;
 
-  return items.map((item) => {
+  return (items as any[]).map((item) => {
     const pricePerOz = snapshot ? metalPriceFromSnapshot(item.metalType, snapshot) : 0;
     return itemResultFromRow(item, pricePerOz);
   });
@@ -843,7 +846,7 @@ export async function getBatchById(
       }
     : null;
 
-  const itemResults: BatchItemResult[] = items.map((item) => {
+  const itemResults: BatchItemResult[] = (items as any[]).map((item) => {
     const pricePerOz = snapshot
       ? metalPriceFromSnapshot(item.metalType, snapshot)
       : 0;
@@ -873,8 +876,8 @@ export async function getBatchById(
     formulaVersionId: batch.formulaVersionId ?? null,
     tags: toBatchTags(assignedTags),
     snapshot,
-    calculatorInput: (batch.calculatorInputJson as CalculatorInput | null) ?? null,
-    calculatorOutput: (batch.calculatorOutputJson as CalculatorResult | null) ?? null,
+    calculatorInput: (batch.calculatorInputJson as unknown as CalculatorInput | null) ?? null,
+    calculatorOutput: (batch.calculatorOutputJson as unknown as CalculatorResult | null) ?? null,
     items: itemResults,
     totalNetValue,
     totalGrossValue,
@@ -951,7 +954,7 @@ export async function certifyBatch(
       updatedAt: new Date(),
       // Append signature metadata to audit snapshot
       auditSnapshotJson: {
-        ...batch.auditSnapshot,
+        ...(batch.auditSnapshot as any),
         certificationMetadata: {
           ...metadata,
           signatureTimestamp: new Date().toISOString(),
@@ -987,11 +990,13 @@ export async function verifyBatchIntegrity(
     ? await db.select().from(lots).where(eq(lots.id, batch.lotId)).limit(1)
     : [null];
   
-  const recomputed = calculate(batch.calculatorInput as CalculatorInput, {
+  const recomputed = calculate(batch.calculatorInput as unknown as CalculatorInput, {
     goldUsdPerOz: batch.snapshot.goldUsdPerOz,
     silverUsdPerOz: batch.snapshot.silverUsdPerOz,
     platinumUsdPerOz: batch.snapshot.platinumUsdPerOz,
     palladiumUsdPerOz: batch.snapshot.palladiumUsdPerOz,
+    source: batch.snapshot.source,
+    fetchedAt: batch.snapshot.fetchedAt,
   }, (lot?.refiningFeeSchedule as RefiningFeeSchedule) || {});
 
   // Strict numerical check on total net value

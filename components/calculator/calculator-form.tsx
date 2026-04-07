@@ -23,6 +23,8 @@ import {
   targetMetalOptions,
 } from "@/lib/validations/calculator";
 
+import { Zap, ShieldCheck } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useSerialScale } from "@/hooks/use-serial-scale";
 import { sovereignDB } from "@/lib/offline/storage";
 import { calculate } from "@/lib/metals/calculator-service";
@@ -142,8 +144,10 @@ export function CalculatorForm() {
           formulaVersionId: undefined,
           fetchedAt: cached.timestamp,
           currency: "USD",
-          hasAnomaly: false, // Local cache doesn't run 3-sigma
+          hasAnomaly: false,
           confidenceBands: null,
+          isHardwareVerified,
+          hardwareDeviceId,
         });
         setLastCalculatedPayload(calculatorPayload);
         setIsUsingStalePrices(true);
@@ -358,17 +362,35 @@ export function CalculatorForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="startingWeightGrams">Starting Weight (g)</Label>
+              <Label htmlFor="startingWeightGrams" className="flex items-center gap-2">
+                Starting Weight (g)
+                {isHardwareVerified && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-emerald-600 border border-emerald-500/20 shadow-sm shadow-emerald-500/10">
+                    <Zap className="h-2 w-2 fill-emerald-600" />
+                    Hardware Captured
+                  </span>
+                )}
+              </Label>
               <div className="flex gap-2">
-                <Input
-                  id="startingWeightGrams"
-                  type="number"
-                  step="0.01"
-                  className={isHardwareVerified ? "border-emerald-500 bg-emerald-50 text-emerald-900 font-bold" : ""}
-                  {...form.register("startingWeightGrams", {
-                    onChange: () => setIsHardwareVerified(false) // Manual edit breaks verification
-                  })}
-                />
+                <div className="relative flex-1">
+                  <Input
+                    id="startingWeightGrams"
+                    type="number"
+                    step="0.01"
+                    className={cn(
+                      "pr-8",
+                      isHardwareVerified && "border-emerald-500 bg-emerald-50 text-emerald-900 font-bold"
+                    )}
+                    {...form.register("startingWeightGrams", {
+                      onChange: () => setIsHardwareVerified(false) // Manual edit breaks verification
+                    })}
+                  />
+                  {isHardwareVerified && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                    </div>
+                  )}
+                </div>
                 <Button 
                   type="button" 
                   variant={isConnected ? "outline" : "default"}

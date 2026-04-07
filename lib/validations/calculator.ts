@@ -74,6 +74,7 @@ export const calculatorResultSchema = z.object({
   // Weight metrics
   weightInOz: z.number(),
   recoveredMetalWeight: z.number(),
+  recoveredMetalMetalWeightOz: z.number(), // Legacy field preserved for schema compatibility
   recoveredMetalWeightOz: z.number(),
   // Value metrics
   pricePerOz: z.number(),

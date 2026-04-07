@@ -102,7 +102,7 @@ export default async function FinanceDashboardPage() {
                     <td colSpan={6} className="py-12 text-center text-slate-400 italic">No active settlements found.</td>
                   </tr>
                 ) : (
-                  activeSettlements.map(settlement => (
+                  activeSettlements.map((settlement: any) => (
                     <tr key={settlement.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                       <td className="py-4 font-mono font-bold text-slate-600">#{settlement.id.slice(0, 8)}</td>
                       <td className="py-4 font-bold text-slate-900">{settlement.supplierName || "—"}</td>

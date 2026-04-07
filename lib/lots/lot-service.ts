@@ -10,7 +10,7 @@ export async function listLots(teamId: string): Promise<LotApiData[]> {
     .where(eq(lots.teamId, teamId))
     .leftJoin(lotRoi, eq(lots.id, lotRoi.lotId));
 
-  return result.map(({ lots: lot, lot_roi: roi }) => ({
+  return result.map(({ lots: lot, lot_roi: roi }: any) => ({
     id: lot.id,
     teamId: lot.teamId,
     lotNumber: lot.lotNumber,

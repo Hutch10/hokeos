@@ -67,13 +67,17 @@ export type CalculatorResult = {
   currency: "USD";
 
   // ── Metadata ────────────────────────────────────────────────────────────
-  isHardwareVerified?: boolean;
-  hardwareDeviceId?: string;
+  isHardwareVerified: boolean;
+  hardwareDeviceId?: string | null;
   lotId?: string;
 
   // ── Phase 44: Audit Data ────────────────────────────────────────────────
   /** Immutable v1.4.0 Trust Snapshot for this specific item */
   auditSnapshot?: CalculationSnapshot;
+  
+  /** Phase 55: Anomaly Detection / Signal Analysis */
+  hasAnomaly?: boolean;
+  confidenceBands?: { lower: number; upper: number } | null;
 };
 
 /**
@@ -148,6 +152,8 @@ export function calculate(
     hardwareDeviceId: input.hardwareDeviceId,
     lotId: input.lotId,
     auditSnapshot: roiResult.snapshot,
+    hasAnomaly: false, // Baseline: Nominal
+    confidenceBands: null, // Baseline: Standard Confidence
   };
 }
 

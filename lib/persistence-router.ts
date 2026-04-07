@@ -24,6 +24,24 @@ const DB_RESILIENCE_ERRORS = [
   "57P01", // Admin shutdown
   "Connection terminated",
   "Connection refused",
+  "Connection terminated",
+  "TIMEOUT",
+  "POOL",
+  "QUEUE",
+  "SSL",
+  "TLS",
+  "NEON",
+  "neon",
+  "TOO_MANY_CONNECTIONS",
+  "max_connections",
+  "pool timeout",
+  "could not connect",
+  "ConnectionError",
+  "PoolError",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "HPE_UNEXPECTED_CONTENT_LENGTH",
+  "HPE_CEOS_FAULT",
 ];
 
 /**
@@ -71,12 +89,40 @@ function isDatabaseError(err: Error | unknown): boolean {
     "ETIMEDOUT",
     "AUTHENTICATION FAILED",
     "CONNECTION TERMINATED",
+    "CONNECTION TIMEOUT",
+    "POOL TIMEOUT",
+    "QUEUE",
+    "SSL ERROR",
+    "CERTIFICATE",
+    "HOST UNREACHABLE",
+    "NETWORK",
+    "BROKEN PIPE",
+    "PROTOCOL",
+    "REQUEST BODY TOO LARGE",
   ];
 
   if (patterns.some(p => message.includes(p))) return true;
 
-  if (process.env.NODE_ENV === "development") {
-    if (code.startsWith("E") || message.includes("FETCH") || message.includes("DATABASE")) {
+  // In production, be more aggressive about catching database errors
+  if (process.env.NODE_ENV === "production") {
+    // Check for common neon/postgres error patterns
+    if (
+      message.includes("DATABASE") ||
+      message.includes("POSTGRES") ||
+      message.includes("NEON") ||
+      message.includes("SQL") ||
+      message.includes("QUERY") ||
+      message.includes("CONNECTION") ||
+      message.includes("TIMEOUT") ||
+      message.includes("SSL") ||
+      message.includes("CERT") ||
+      message.includes("NETWORK") ||
+      message.includes("EOF") ||
+      code.startsWith("E") ||
+      code.startsWith("P") ||
+      code.includes("CONN") ||
+      code.includes("ERR")
+    ) {
       return true;
     }
   }

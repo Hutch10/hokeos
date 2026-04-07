@@ -24,7 +24,7 @@ async function runBenchmark() {
     .groupBy(auditTrace.action);
   
   console.log("[Security] Distribution:");
-  securityEvents.forEach(e => console.log(`  - ${e.action}: ${e.count}`));
+  securityEvents.forEach((e: any) => console.log(`  - ${e.action}: ${e.count}`));
 
   // 3. Price Ingestion Reliability
   const [ingestStats] = await db.select({

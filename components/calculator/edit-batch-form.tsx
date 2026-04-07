@@ -127,8 +127,13 @@ export function EditBatchForm({
       marginPct: apiData.marginPct,
       recoveryRatePct: apiData.recoveryRatePct,
       acquisitionCostUsd: apiData.acquisitionCostUsd,
-      snapshotId: apiData.snapshotId,
+      snapshotId: apiData.snapshotId ?? null,
       formulaVersionId: undefined,
+      currency: "USD",
+      isHardwareVerified: apiData.isHardwareVerified,
+      hasAnomaly: apiData.hasAnomaly,
+      confidenceBands: apiData.confidenceBands,
+      fetchedAt: apiData.priceFetchedAt,
     };
 
     setLastCalculatedPayload(payload);

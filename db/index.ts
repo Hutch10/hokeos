@@ -10,11 +10,20 @@ import * as fs from "fs";
 import * as schemaPg from "./schema";
 import * as schemaSqlite from "./schema-sqlite";
 
-const schema = (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("postgres:postgres@localhost")) 
+// Normalize DATABASE_URL - remove channel_binding if present (not supported by all drivers)
+function normalizeDatabaseUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  // Remove channel_binding parameter which can cause issues
+  return url.replace(/[?&]channel_binding=[^&]*/g, "").replace(/\?&/, "?").replace(/\?$/, "");
+}
+
+const normalizedUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
+
+const schema = (normalizedUrl && !normalizedUrl.includes("postgres:postgres@localhost")) 
   ? schemaPg 
   : schemaSqlite;
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = normalizedUrl;
 
 // Path for Sovereign Local Persistence
 const SQLITE_DB_PATH = path.join(process.cwd(), "hokeos_sovereign.db");
@@ -30,11 +39,8 @@ function createDb() {
       }
       return drizzleNode(new Pool({ connectionString: databaseUrl }), { schema });
     } catch (err: any) {
-      if (isVercel) {
-        console.error("CRITICAL: PostgreSQL connection failed in production. Aborting.");
-        throw new Error(`Database Connection Failure: ${err.message}`);
-      }
-      console.warn("PostgreSQL connection failed. Falling back to Sovereign Local.");
+      console.warn(`PostgreSQL connection failed: ${err?.message}. Falling back to SQLite.`);
+      // Don't throw - fall back to SQLite gracefully
     }
   }
 

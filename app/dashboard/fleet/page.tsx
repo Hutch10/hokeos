@@ -90,7 +90,7 @@ export default async function FleetDashboardPage() {
                    No assets detected in telemetry gate.
                 </div>
               ) : (
-                activeAssets.map(asset => (
+                activeAssets.map((asset: any) => (
                   <div key={asset.id} className="p-4 bg-slate-900 border border-slate-700 rounded-2xl flex justify-between items-center hover:border-blue-500/50 transition-colors cursor-pointer">
                     <div className="flex gap-4">
                        <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center border border-slate-600">
@@ -127,7 +127,7 @@ export default async function FleetDashboardPage() {
                 {activeDispatches.length === 0 ? (
                    <div className="py-8 text-center text-slate-500 font-mono text-sm uppercase">No pending dispatches.</div>
                 ) : (
-                  activeDispatches.map(dispatch => (
+                  activeDispatches.map((dispatch: any) => (
                     <div key={dispatch.id} className="p-4 bg-slate-900 border-l-4 border-l-blue-500 rounded-r-2xl space-y-2">
                        <div className="flex justify-between items-center">
                           <span className="text-[10px] font-black uppercase text-blue-500 tracking-widest font-mono">D_#{dispatch.id.slice(0, 4)}</span>

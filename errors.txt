@@ -1,0 +1,41 @@
+app/dashboard/finance/page.tsx(105,41): error TS7006: Parameter 'settlement' implicitly has an 'any' type.
+app/dashboard/fleet/page.tsx(93,34): error TS7006: Parameter 'asset' implicitly has an 'any' type.
+app/dashboard/fleet/page.tsx(130,40): error TS7006: Parameter 'dispatch' implicitly has an 'any' type.
+app/dashboard/yard/page.tsx(77,31): error TS7006: Parameter 'ticket' implicitly has an 'any' type.
+app/page.tsx(10,17): error TS2322: Type '{ children: string; size: string; }' is not assignable to type 'IntrinsicAttributes & ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline" | undefined; } & RefAttributes<...>'.
+  Property 'size' does not exist on type 'IntrinsicAttributes & ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline" | undefined; } & RefAttributes<...>'.
+components/calculator/edit-batch-form.tsx(130,7): error TS2322: Type 'string | undefined' is not assignable to type 'string | null'.
+  Type 'undefined' is not assignable to type 'string | null'.
+hooks/use-serial-scale.ts(80,43): error TS18047: 'reader' is possibly 'null'.
+lib/investigations/service.ts(85,20): error TS7006: Parameter 'row' implicitly has an 'any' type.
+lib/logger.ts(1,30): error TS7016: Could not find a declaration file for module 'uuid'. 'C:/Users/hetfw/hutchcore-platform/apps/hokeos-web/node_modules/uuid/dist/esm-browser/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/uuid` if it exists or add a new declaration (.d.ts) file containing `declare module 'uuid';`
+lib/lots/lot-service.ts(13,30): error TS7031: Binding element 'lot' implicitly has an 'any' type.
+lib/lots/lot-service.ts(13,44): error TS7031: Binding element 'roi' implicitly has an 'any' type.
+lib/metals/batch-service.mock.ts(60,9): error TS2322: Type '{ id: string; metalType: string; weight: number; weightUnit: string; purityPct: number; recoveryRatePct: number; acquisitionCostUsd: number; formulaVersion: string; weightInOz: number; recoveredMetalWeight: number; ... 7 more ...; auditSnapshot: undefined; }' is not assignable to type 'BatchItemResult'.
+  Property 'recoveredMetalMetalWeightOz' is missing in type '{ id: string; metalType: string; weight: number; weightUnit: string; purityPct: number; recoveryRatePct: number; acquisitionCostUsd: number; formulaVersion: string; weightInOz: number; recoveredMetalWeight: number; ... 7 more ...; auditSnapshot: undefined; }' but required in type 'CalculatorResult'.
+lib/prices/price-history-service.ts(147,14): error TS7006: Parameter 'point' implicitly has an 'any' type.
+lib/reports/scheduler-service.ts(90,33): error TS2345: Argument of type 'BatchResult' is not assignable to parameter of type '{ id: string; teamId: string; userId: string; status: string; trustScore?: string | number | null | undefined; priceSnapshotId?: string | undefined; formulaVersionId?: string | null | undefined; ... 19 more ...; createdAt?: string | ... 1 more ... | undefined; }'.
+  Types of property 'calculatorOutput' are incompatible.
+    Type 'CalculatorResult | null' is not assignable to type '{ metalType: string; weight: number; weightUnit: string; purityPct: number; recoveryRatePct: number; acquisitionCostUsd: number; formulaVersion: string; weightInOz: number; recoveredMetalWeight: number; ... 13 more ...; confidenceBands?: { ...; } | ... 1 more ... | undefined; } | null | undefined'.
+      Type 'CalculatorResult' is not assignable to type '{ metalType: string; weight: number; weightUnit: string; purityPct: number; recoveryRatePct: number; acquisitionCostUsd: number; formulaVersion: string; weightInOz: number; recoveredMetalWeight: number; ... 13 more ...; confidenceBands?: { ...; } | ... 1 more ... | undefined; }'.
+        Types of property 'isHardwareVerified' are incompatible.
+          Type 'boolean | undefined' is not assignable to type 'boolean'.
+            Type 'undefined' is not assignable to type 'boolean'.
+lib/reports/scheduler-service.ts(92,41): error TS2345: Argument of type 'BatchResult' is not assignable to parameter of type '{ id: string; teamId: string; userId: string; status: string; trustScore?: string | number | null | undefined; priceSnapshotId?: string | undefined; formulaVersionId?: string | null | undefined; ... 19 more ...; createdAt?: string | ... 1 more ... | undefined; }'.
+  Types of property 'calculatorOutput' are incompatible.
+    Type 'CalculatorResult | null' is not assignable to type '{ metalType: string; weight: number; weightUnit: string; purityPct: number; recoveryRatePct: number; acquisitionCostUsd: number; formulaVersion: string; weightInOz: number; recoveredMetalWeight: number; ... 13 more ...; confidenceBands?: { ...; } | ... 1 more ... | undefined; } | null | undefined'.
+      Type 'CalculatorResult' is not assignable to type '{ metalType: string; weight: number; weightUnit: string; purityPct: number; recoveryRatePct: number; acquisitionCostUsd: number; formulaVersion: string; weightInOz: number; recoveredMetalWeight: number; ... 13 more ...; confidenceBands?: { ...; } | ... 1 more ... | undefined; }'.
+        Types of property 'isHardwareVerified' are incompatible.
+          Type 'boolean | undefined' is not assignable to type 'boolean'.
+            Type 'undefined' is not assignable to type 'boolean'.
+lib/reports/scheduler-service.ts(93,37): error TS2345: Argument of type 'BatchResult' is not assignable to parameter of type '{ id: string; teamId: string; userId: string; status: string; trustScore?: string | number | null | undefined; priceSnapshotId?: string | undefined; formulaVersionId?: string | null | undefined; ... 19 more ...; createdAt?: string | ... 1 more ... | undefined; }'.
+  Types of property 'calculatorOutput' are incompatible.
+    Type 'CalculatorResult | null' is not assignable to type '{ metalType: string; weight: number; weightUnit: string; purityPct: number; recoveryRatePct: number; acquisitionCostUsd: number; formulaVersion: string; weightInOz: number; recoveredMetalWeight: number; ... 13 more ...; confidenceBands?: { ...; } | ... 1 more ... | undefined; } | null | undefined'.
+      Type 'CalculatorResult' is not assignable to type '{ metalType: string; weight: number; weightUnit: string; purityPct: number; recoveryRatePct: number; acquisitionCostUsd: number; formulaVersion: string; weightInOz: number; recoveredMetalWeight: number; ... 13 more ...; confidenceBands?: { ...; } | ... 1 more ... | undefined; }'.
+        Types of property 'isHardwareVerified' are incompatible.
+          Type 'boolean | undefined' is not assignable to type 'boolean'.
+            Type 'undefined' is not assignable to type 'boolean'.
+lib/tags/tag-service.ts(26,20): error TS7006: Parameter 'row' implicitly has an 'any' type.
+lib/tags/tag-service.ts(180,20): error TS7006: Parameter 'row' implicitly has an 'any' type.
+scripts/industrial-audit-benchmark.ts(27,26): error TS7006: Parameter 'e' implicitly has an 'any' type.

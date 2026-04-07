@@ -142,7 +142,7 @@ export async function getHistoricalPrices(
     .orderBy(asc(metalPrices.timestamp))
     .limit(limit);
 
-  return rows
+  return (rows as any[])
     .map(toPoint)
     .filter((point): point is MetalPricePoint => point !== null);
 }

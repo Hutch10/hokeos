@@ -36,7 +36,7 @@ export async function getUserTeams(userId: string): Promise<TeamSummary[]> {
       .where(eq(teamMembers.userId, userId))
       .orderBy(asc(teams.name));
 
-    return rows.map((row) => ({
+    return (rows as any[]).map((row) => ({
       id: row.id,
       name: row.name,
       ownerId: row.ownerId,
@@ -317,7 +317,7 @@ export async function listTeamMembers(userId: string, teamId: string): Promise<A
     .where(eq(teamMembers.teamId, teamId))
     .orderBy(users.email);
 
-  return rows.map((row) => ({
+  return (rows as Array<{ id: string; userId: string; email: string; name: string | null; role: TeamRole }>).map((row) => ({
     id: row.id,
     userId: row.userId,
     email: row.email,

@@ -119,6 +119,8 @@ export function buildForecast(prices: MetalPricePoint[], method?: ProjectionMeth
     regressionProjectedPrice: lastPrice * 1.03,
     volatilityPct: 1.2,
     confidenceIndicator: "high",
+    hasAnomaly: false,
+    confidenceBands: null,
     curve: prices.map(p => ({
       timestamp: p.timestamp,
       actualPriceUsdPerUnit: p.priceUsdPerUnit,
@@ -140,6 +142,8 @@ export async function getForecastOverview(): Promise<ForecastOverviewRow[]> {
       regressionProjectedPrice: 2210.0,
       confidenceIndicator: "high",
       volatilityPct: 0.8,
+      hasAnomaly: false,
+      confidenceBands: null,
       curve: [{ timestamp: new Date(), actualPriceUsdPerUnit: 2150, projectedPriceUsdPerUnit: 2150 }],
     },
   ];

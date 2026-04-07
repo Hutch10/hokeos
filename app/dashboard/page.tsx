@@ -1,5 +1,4 @@
 import Link from "next/link";
-
 import { DashboardMetricCard } from "@/components/dashboard/dashboard-metric-card";
 import { FilterBar } from "@/components/dashboard/filter-bar";
 import { MetalPerformanceTrend } from "@/components/dashboard/metal-performance-trend";
@@ -13,8 +12,8 @@ import { PerformanceHeatmap, type HeatmapPoint } from "@/components/dashboard/pe
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlphaHealth } from "@/components/dashboard/alpha-health";
 import { ClassificationLabel } from "@/components/ui/classification-label";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { PERSISTENCE_MODE } from "@/db";
 import {
   buildChartData,
   type FilteredBatchForCharts,
@@ -34,8 +33,6 @@ import {
   type BatchApiData,
 } from "@/lib/validations/calculator";
 import { requireCurrentUser } from "@/lib/auth";
-import { type LotApiData } from "@/lib/validations/lots";
-import { type RecentReportRow, type ReportScheduleRow } from "@/lib/reports";
 import { type ProjectionMethod } from "@/lib/prices";
 
 type DashboardSearchParams = Record<string, string | string[] | undefined>;
@@ -101,22 +98,15 @@ function fmt4(value: number): string {
 }
 
 function fmtSignedPct(value: number | null): string {
-  if (value == null) {
-    return "n/a";
-  }
-
+  if (value == null) return "n/a";
   return `${value >= 0 ? "+" : ""}${fmt2(value)}%`;
 }
 
 function buildSparklinePath(values: number[], width: number, height: number): string {
-  if (values.length === 0) {
-    return "";
-  }
-
+  if (values.length === 0) return "";
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = max - min || 1;
-
   return values
     .map((value, index) => {
       const x = values.length === 1 ? width / 2 : (index / (values.length - 1)) * width;
@@ -128,14 +118,10 @@ function buildSparklinePath(values: number[], width: number, height: number): st
 
 function formatProjectionMethod(method: ProjectionMethod): string {
   switch (method) {
-    case "sma":
-      return "SMA";
-    case "ema":
-      return "EMA";
-    case "regression":
-      return "Regression";
-    case "statistical":
-      return "Statistical";
+    case "sma": return "SMA";
+    case "ema": return "EMA";
+    case "regression": return "Regression";
+    case "statistical": return "Statistical";
   }
 }
 
@@ -148,36 +134,29 @@ export default async function DashboardPage({
   const user = await requireCurrentUser();
   const isMockRequested = params.mock === "true";
   
-  // Resolve services from the gateway
   const batchService = await getBatchService(isMockRequested);
   const lotService = await getLotService(isMockRequested);
   const billingService = await getBillingService(isMockRequested);
   const priceService = await getPriceService(isMockRequested);
   const investigationService = await getInvestigationService(isMockRequested);
 
-  const billing = await billingService.getBillingSummary(user.activeTeamId);
-  const marketOverview = await priceService.getMarketOverview();
-  const forecastOverview = await priceService.getForecastOverview();
-  
-  const recentReports: RecentReportRow[] = []; 
-  const scheduledReports: ReportScheduleRow[] = []; 
-  const recentInvestigations = await investigationService.listInvestigations(user.activeTeamId);
+  const [billing, marketOverview, forecastOverview, recentInvestigations, rawBatches, rawLots] = await Promise.all([
+    billingService.getBillingSummary(user.activeTeamId).catch(() => ({ record: {} as any, teamId: user.activeTeamId, plan: "free" as const, status: "active" as const, definition: { label: "Free", batchLimit: 10, exportsEnabled: false, comparisonEnabled: false, prioritySupport: false, customLimits: false }, batchCount: 0, remainingBatches: 10, canCreateBatch: true, canExport: false, canCompare: false })),
+    priceService.getMarketOverview().catch(() => []),
+    priceService.getForecastOverview().catch(() => []),
+    investigationService.listInvestigations(user.activeTeamId).catch((err: Error) => { console.warn("Investigations failed:", err.message); return []; }),
+    batchService.listBatches(user.id).catch(() => []),
+    lotService.listLots(user.activeTeamId).catch(() => []),
+  ]);
+
   const filters = parseFilterState(params);
 
   let batches: BatchApiData[] = [];
-  let lots: LotApiData[] = [];
   let fetchError: string | null = null;
 
   try {
-    const [rawBatches, rawLots] = await Promise.all([
-      batchService.listBatches(user.id),
-      lotService.listLots(user.activeTeamId),
-    ]);
-    
-    lots = rawLots;
     const parsedBatches: BatchApiData[] = [];
-
-    for (const rawBatch of rawBatches) {
+    for (const rawBatch of (rawBatches || [])) {
       const parsed = batchApiResponseSchema.safeParse({ ok: true, data: rawBatch });
       if (!parsed.success || !parsed.data.ok || !parsed.data.data) {
         fetchError = "Failed to parse dashboard data. Check schema compatibility.";
@@ -185,749 +164,159 @@ export default async function DashboardPage({
       }
       parsedBatches.push(parsed.data.data);
     }
-
     batches = parsedBatches;
   } catch (err: unknown) {
-    const error = err instanceof Error ? err : new Error(String(err));
-    console.error("Dashboard fetch error:", error);
-    fetchError = "Failed to load dashboard data. Check your database connection or use ?mock=true.";
+    fetchError = "Failed to load dashboard data. Check your database connection.";
   }
 
   const filteredBatches: FilteredBatchForCharts[] = batches
     .map((batch) => {
       const batchDate = batch.createdAt ? new Date(batch.createdAt) : null;
-      const batchItems = batch.items ?? [];
+      if (filters.startDate && batchDate && batchDate < new Date(`${filters.startDate}T00:00:00.000Z`)) return null;
+      if (filters.endDate && batchDate && batchDate > new Date(`${filters.endDate}T23:59:59.999Z`)) return null;
 
-      if (filters.startDate && batchDate) {
-        const start = new Date(`${filters.startDate}T00:00:00.000Z`);
-        if (batchDate < start) {
-          return null;
-        }
-      }
-
-      if (filters.endDate && batchDate) {
-        const end = new Date(`${filters.endDate}T23:59:59.999Z`);
-        if (batchDate > end) {
-          return null;
-        }
-      }
-
-      const filteredItems = batchItems.filter((item) => {
-        if (filters.metalTypes.length > 0 && !filters.metalTypes.includes(item.metalType)) {
-          return false;
-        }
-        if (filters.minPurity != null && item.purityPct < filters.minPurity) {
-          return false;
-        }
-        if (filters.maxPurity != null && item.purityPct > filters.maxPurity) {
-          return false;
-        }
-        if (filters.minRecoveryRate != null && item.recoveryRatePct < filters.minRecoveryRate) {
-          return false;
-        }
-        if (filters.maxRecoveryRate != null && item.recoveryRatePct > filters.maxRecoveryRate) {
-          return false;
-        }
+      const filteredItems = (batch.items ?? []).filter((item) => {
+        if (filters.metalTypes.length > 0 && !filters.metalTypes.includes(item.metalType)) return false;
+        if (filters.minPurity != null && item.purityPct < filters.minPurity) return false;
+        if (filters.maxPurity != null && item.purityPct > filters.maxPurity) return false;
+        if (filters.minRecoveryRate != null && item.recoveryRatePct < filters.minRecoveryRate) return false;
+        if (filters.maxRecoveryRate != null && item.recoveryRatePct > filters.maxRecoveryRate) return false;
         return true;
       });
 
-      if (filteredItems.length === 0) {
-        return null;
-      }
-
-      return { batch, items: filteredItems };
+      return filteredItems.length > 0 ? { batch, items: filteredItems } : null;
     })
     .filter((entry): entry is FilteredBatchForCharts => entry !== null);
 
   const items = filteredBatches.flatMap((entry) => entry.items);
-
   const totalBatches = filteredBatches.length;
-  const totalLots = lots.length;
+  const totalLots = (rawLots || []).length;
   const totalRecoveredMetal = items.reduce((sum, item) => sum + item.recoveredMetalWeight, 0);
-  
-  // Combine Batch Gross + Lot Revenue
-  const totalGrossValue = items.reduce((sum, item) => sum + item.grossValue, 0) + 
-                         lots.reduce((sum, lot) => sum + Number(lot.roi?.revenue ?? 0), 0);
-                         
-  const totalNetValue = items.reduce((sum, item) => sum + item.netValue, 0) +
-                       lots.reduce((sum, lot) => sum + Number(lot.roi?.revenue ?? 0), 0);
-                       
-  const totalProfitLoss = items.reduce((sum, item) => sum + item.profitLoss, 0) +
-                         lots.reduce((sum, lot) => sum + Number(lot.roi?.profit ?? 0), 0);
-
-  const marginValues = [
-    ...items.map((item) => item.marginPct),
-    ...lots.map((lot) => lot.roi?.marginPct ? Number(lot.roi.marginPct) : null)
-  ].filter((margin): margin is number => margin !== null);
-  
-  const averageMarginPct =
-    marginValues.length > 0
-      ? marginValues.reduce((sum, margin) => sum + margin, 0) / marginValues.length
-      : null;
+  const totalGrossValue = items.reduce((sum, item) => sum + item.grossValue, 0) + (rawLots || []).reduce((sum: number, lot: any) => sum + Number(lot.roi?.revenue ?? 0), 0);
+  const totalNetValue = items.reduce((sum, item) => sum + item.netValue, 0) + (rawLots || []).reduce((sum: number, lot: any) => sum + Number(lot.roi?.revenue ?? 0), 0);
+  const totalProfitLoss = items.reduce((sum, item) => sum + item.profitLoss, 0) + (rawLots || []).reduce((sum: number, lot: any) => sum + Number(lot.roi?.profit ?? 0), 0);
+  const marginValues = [...items.map(i => i.marginPct), ...(rawLots || []).map((l: any) => l.roi?.marginPct ? Number(l.roi.marginPct) : null)].filter((m): m is number => m !== null);
+  const averageMarginPct = marginValues.length > 0 ? marginValues.reduce((s, m) => s + m, 0) / marginValues.length : null;
 
   const metalMap = new Map<string, MetalBreakdownRow>();
   for (const item of items) {
-    const current = metalMap.get(item.metalType) ?? {
-      metalType: item.metalType,
-      itemCount: 0,
-      recoveredMetalWeight: 0,
-      grossValue: 0,
-      netValue: 0,
-      profitLoss: 0,
-    };
-
+    const current = metalMap.get(item.metalType) ?? { metalType: item.metalType, itemCount: 0, recoveredMetalWeight: 0, grossValue: 0, netValue: 0, profitLoss: 0 };
     current.itemCount += 1;
     current.recoveredMetalWeight += item.recoveredMetalWeight;
     current.grossValue += item.grossValue;
     current.netValue += item.netValue;
     current.profitLoss += item.profitLoss;
-
     metalMap.set(item.metalType, current);
   }
-
   const metalBreakdown = Array.from(metalMap.values()).sort((a, b) => b.netValue - a.netValue);
 
   const tagSummaryMap = new Map<string, { id: string; name: string; color: string | null; batchCount: number; totalNetValue: number; totalProfitLoss: number }>();
-
   for (const entry of filteredBatches) {
-    const batchTags = entry.batch.tags ?? [];
     const batchNet = entry.items.reduce((sum, item) => sum + item.netValue, 0);
     const batchProfitLoss = entry.items.reduce((sum, item) => sum + item.profitLoss, 0);
-
-    for (const tag of batchTags) {
-      const current = tagSummaryMap.get(tag.id) ?? {
-        id: tag.id,
-        name: tag.name,
-        color: tag.color ?? null,
-        batchCount: 0,
-        totalNetValue: 0,
-        totalProfitLoss: 0,
-      };
-
+    for (const tag of (entry.batch.tags ?? [])) {
+      const current = tagSummaryMap.get(tag.id) ?? { id: tag.id, name: tag.name, color: tag.color ?? null, batchCount: 0, totalNetValue: 0, totalProfitLoss: 0 };
       current.batchCount += 1;
       current.totalNetValue += batchNet;
       current.totalProfitLoss += batchProfitLoss;
-
       tagSummaryMap.set(tag.id, current);
     }
   }
+  const tagSummary = Array.from(tagSummaryMap.values()).sort((a, b) => b.batchCount !== a.batchCount ? b.batchCount - a.batchCount : b.totalNetValue - a.totalNetValue);
 
-  const tagSummary = Array.from(tagSummaryMap.values()).sort((a, b) => {
-    if (b.batchCount !== a.batchCount) {
-      return b.batchCount - a.batchCount;
-    }
-
-    return b.totalNetValue - a.totalNetValue;
-  });
-
-  const chartData = buildChartData({ filteredBatches, lots });
-
-  const monthlySummary: MonthlySummaryRow[] = [...chartData.monthlySeries]
-    .map((point) => ({
-      month: point.period,
-      totalRecoveredMetal: point.recoveredMetalWeight,
-      totalNetValue: point.netValue,
-      totalProfitLoss: point.profitLoss,
-      averageMarginPct: point.averageMarginPct,
-    }))
-    .sort((a, b) => b.month.localeCompare(a.month));
-
-  const heatmapPoints: HeatmapPoint[] = filteredBatches.map((entry) => {
-    const batch = entry.batch;
-    const batchNet = entry.items.reduce((sum, item) => sum + item.netValue, 0);
-    const batchProfit = entry.items.reduce((sum, item) => sum + item.profitLoss, 0);
-    const marginPct = batchNet > 0 ? (batchProfit / batchNet) * 100 : 0;
-    
-    // Extract confidence from Phase 14 Audit Snapshot
-    const confidenceScore = batch.auditSnapshot?.confidence?.score ?? 100;
-    const isDegraded = batch.auditSnapshot?.confidence?.degradedMode ?? false;
-
-    return {
-      id: batch.id,
-      netValue: batchNet,
-      marginPct,
-      confidenceScore,
-      metalType: entry.items[0]?.metalType ?? "unknown",
-      isDegraded,
-    };
-  });
+  const chartData = buildChartData({ filteredBatches, lots: rawLots || [] });
+  const monthlySummary: MonthlySummaryRow[] = [...chartData.monthlySeries].map((p) => ({ month: p.period, totalRecoveredMetal: p.recoveredMetalWeight, totalNetValue: p.netValue, totalProfitLoss: p.profitLoss, averageMarginPct: p.averageMarginPct })).sort((a, b) => b.month.localeCompare(a.month));
+  const heatmapPoints: HeatmapPoint[] = filteredBatches.map((entry) => ({ id: entry.batch.id, netValue: entry.items.reduce((s, i) => s + i.netValue, 0), marginPct: entry.items.reduce((s, i) => s + i.netValue, 0) > 0 ? (entry.items.reduce((s, i) => s + i.profitLoss, 0) / entry.items.reduce((s, i) => s + i.netValue, 0)) * 100 : 0, confidenceScore: entry.batch.auditSnapshot?.confidence?.score ?? 100, metalType: entry.items[0]?.metalType ?? "unknown", isDegraded: entry.batch.auditSnapshot?.confidence?.degradedMode ?? false }));
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-zinc-100 via-white to-zinc-100 px-4 py-10 sm:px-6 lg:px-8">
-      <section className="mx-auto w-full max-w-6xl space-y-6">
-        <header className="space-y-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">ROI Dashboard</h1>
-            <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-700">
-              {user.activeTeamName}
-            </span>
-            <span className="rounded-full border border-cyan-300 bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-800">
-              {billing.definition.label}
-            </span>
-            <span className="rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-zinc-700">
-              {billing.status.replace(/_/g, " ")}
-            </span>
-          </div>
-          <p className="text-zinc-600">
-            Portfolio-level recovery performance from saved Batches and Lot Lifecycles.
-          </p>
-          <p className="text-sm text-zinc-500">
-            {billing.definition.batchLimit == null
-              ? `${billing.batchCount} saved batches on an unlimited plan.`
-              : `${billing.batchCount} / ${billing.definition.batchLimit} saved batches used.`}
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/batches"
-              className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
-            >
-              View Batches
-            </Link>
-            <Link
-              href="/batches?mode=compare"
-              className="rounded-md bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700"
-            >
-              Compare Batches
-            </Link>
-            <Link
-              href="/calculator"
-              className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
-            >
-              New Calculation
-            </Link>
-            <Link
-              href="/billing"
-              className="rounded-md border border-cyan-300 bg-cyan-50 px-4 py-2 text-sm font-medium text-cyan-800 hover:bg-cyan-100"
-            >
-              {billing.plan === "free" ? "Upgrade Plan" : "Manage Billing"}
-            </Link>
-            <Link
-              href="/lots"
-              className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
-            >
-              Manage Lots
-            </Link>
-            <Link
-              href="/audit/verify"
-              className="rounded-md border border-violet-300 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-800 hover:bg-violet-100"
-            >
-              Verify Integrity
-            </Link>
+    <main className="min-h-screen bg-zinc-950 px-4 py-8 sm:px-6 lg:px-8 selection:bg-cyan-500/30 text-white">
+      <section className="mx-auto w-full max-w-7xl space-y-8">
+        <header className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 sm:p-8 backdrop-blur-sm shadow-xl">
+          <div className="absolute right-0 top-0 -mr-20 -mt-20 h-64 w-64 rounded-full bg-cyan-500/5 blur-3xl" />
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-3xl font-bold tracking-tight text-white italic">Operational Cockpit</h1>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full border border-zinc-700 bg-zinc-800 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">{user.activeTeamName}</span>
+                  <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400">{billing.definition.label}</span>
+                </div>
+              </div>
+              <p className="max-w-2xl text-sm text-zinc-400 italic">Deterministic performance monitoring for industrial precious metal recovery. Tracking {billing.batchCount} validated batches.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/calculator"><Button size="lg" className="shadow-lg shadow-cyan-500/10 hover:bg-cyan-500 transition-all">Initialize Calculation</Button></Link>
+              <Link href="/batches"><Button variant="outline" size="lg" className="border-zinc-700 bg-zinc-800/50 text-white hover:bg-zinc-800">Batch Archive</Button></Link>
+              <Link href="/audit/verify"><Button variant="outline" size="lg" className="border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20">Verify Integrity</Button></Link>
+            </div>
           </div>
         </header>
 
-        <AlphaHealth />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2"><AlphaHealth /></div>
+          <div className="flex flex-col justify-center">
+            {(() => {
+              const snapshot = Sentinel.getSnapshot();
+              let status: "active" | "degraded" | "mocking" | "fallback" = "active";
+              if (snapshot.fallbackTriggerCount > 0) status = "fallback";
+              else if (snapshot.degradedModeCount > 0 || snapshot.stalePriceUsage > 0) status = "degraded";
+              else if (isMockRequested) status = "mocking";
+              return <TrustModeBanner status={status} fallbackCount={snapshot.fallbackTriggerCount} staleCount={snapshot.stalePriceUsage} />;
+            })()}
+          </div>
+        </div>
 
-        {/* Phase 10: Trust-Layer Integration */}
-        {(() => {
-          const snapshot = Sentinel.getSnapshot();
-          let status: "active" | "degraded" | "mocking" | "fallback" = "active";
-          if (snapshot.fallbackTriggerCount > 0) status = "fallback";
-          else if (snapshot.degradedModeCount > 0 || snapshot.stalePriceUsage > 0) status = "degraded";
-          else if (isMockRequested) status = "mocking";
-
-          return (
-            <TrustModeBanner 
-              status={status} 
-              fallbackCount={snapshot.fallbackTriggerCount}
-              staleCount={snapshot.stalePriceUsage}
-            />
-          );
-        })()}
-
-        <FilterBar
-          startDate={filters.startDate}
-          endDate={filters.endDate}
-          selectedMetalTypes={filters.metalTypes}
-          minPurity={filters.minPurity}
-          maxPurity={filters.maxPurity}
-          minRecoveryRate={filters.minRecoveryRate}
-          maxRecoveryRate={filters.maxRecoveryRate}
-          metalTypeOptions={[...targetMetalOptions]}
-        />
+        <FilterBar startDate={filters.startDate} endDate={filters.endDate} selectedMetalTypes={filters.metalTypes} minPurity={filters.minPurity} maxPurity={filters.maxPurity} minRecoveryRate={filters.minRecoveryRate} maxRecoveryRate={filters.maxRecoveryRate} metalTypeOptions={[...targetMetalOptions]} />
 
         {fetchError ? (
-          <Card>
-            <CardContent>
-              <p className="text-sm text-rose-600">{fetchError}</p>
-            </CardContent>
-          </Card>
-        ) : (filteredBatches.length === 0 && lots.length === 0) ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>No Matching Analytics Data</CardTitle>
-              <CardDescription>
-                Adjust filters or save new calculations to see dashboard metrics.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-3">
-                <Link
-                  href="/calculator"
-                  className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
-                >
-                  New Calculation
-                </Link>
-                <Link
-                  href="/batches"
-                  className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
-                >
-                  View Batches
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
+          <Card className="border-rose-900 bg-rose-950/20"><CardContent className="py-6"><p className="text-sm text-rose-400 font-medium">{fetchError}</p></CardContent></Card>
+        ) : (filteredBatches.length === 0 && (rawLots || []).length === 0) ? (
+          <Card className="border-zinc-800 bg-zinc-900/50"><CardHeader><CardTitle className="text-white">No Matching Analytics Data</CardTitle><CardDescription className="text-zinc-500 italic">Adjust filters or save new calculations to see cockpit metrics.</CardDescription></CardHeader><CardContent><div className="flex items-center gap-3"><Link href="/calculator"><Button className="bg-zinc-100 text-zinc-900 hover:bg-zinc-200">New Calculation</Button></Link><Link href="/batches"><Button variant="outline" className="border-zinc-700 text-white">View Batches</Button></Link></div></CardContent></Card>
         ) : (
-          <>
+          <div className="space-y-8">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {(() => {
                 const snapshot = Sentinel.getSnapshot();
                 const systemConfidence = snapshot.fallbackTriggerCount > 0 ? 35 : (snapshot.degradedModeCount > 0 ? 70 : 100);
-                
                 return (
                   <>
                     <DashboardMetricCard label="Total Batches" value={String(totalBatches)} confidence={systemConfidence} />
                     <DashboardMetricCard label="Active Lots" value={String(totalLots)} tone="positive" confidence={systemConfidence} />
-                    <DashboardMetricCard
-                      label="Total Recovered Metal"
-                      value={`${fmt4(totalRecoveredMetal)} g`}
-                      confidence={systemConfidence}
-                    />
-                    <DashboardMetricCard label="Total Gross Value" value={`$${fmt2(totalGrossValue)}`} confidence={systemConfidence} />
-                    <DashboardMetricCard label="Total Net Value" value={`$${fmt2(totalNetValue)}`} confidence={systemConfidence} />
-                    <DashboardMetricCard
-                      label="Total Profit / Loss"
-                      value={`${totalProfitLoss >= 0 ? "+" : ""}$${fmt2(totalProfitLoss)}`}
-                      tone={totalProfitLoss >= 0 ? "positive" : "negative"}
-                      confidence={systemConfidence}
-                    />
-                    <DashboardMetricCard
-                      label="Average Margin %"
-                      value={averageMarginPct != null ? `${fmt2(averageMarginPct)}%` : "n/a"}
-                      confidence={systemConfidence}
-                    />
+                    <DashboardMetricCard label="Metal Recovered" value={`${fmt4(totalRecoveredMetal)} g`} confidence={systemConfidence} />
+                    <DashboardMetricCard label="Gross Value" value={`$${fmt2(totalGrossValue)}`} confidence={systemConfidence} />
+                    <DashboardMetricCard label="Net Value" value={`$${fmt2(totalNetValue)}`} confidence={systemConfidence} />
+                    <DashboardMetricCard label="Profit / Loss" value={`${totalProfitLoss >= 0 ? "+" : ""}$${fmt2(totalProfitLoss)}`} tone={totalProfitLoss >= 0 ? "positive" : "negative"} confidence={systemConfidence} />
+                    <DashboardMetricCard label="Avg Margin %" value={averageMarginPct != null ? `${fmt2(averageMarginPct)}%` : "n/a"} confidence={systemConfidence} />
                   </>
                 );
               })()}
             </div>
 
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Market Overview</CardTitle>
-                    <CardDescription>
-                      Latest server-ingested spot prices with 7-day / 30-day change and volatility signal.
-                    </CardDescription>
-                  </div>
-                  <ClassificationLabel type="canonical" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-zinc-200 text-left text-xs text-zinc-500">
-                        <th className="pb-2 pr-4 font-medium">Metal</th>
-                        <th className="pb-2 pr-4 font-medium">Status</th>
-                        <th className="pb-2 pr-4 font-medium">Latest Price ($/oz)</th>
-                        <th className="pb-2 pr-4 font-medium">7-Day Change</th>
-                        <th className="pb-2 pr-4 font-medium">30-Day Change</th>
-                        <th className="pb-2 pr-4 font-medium">Volatility</th>
-                        <th className="pb-2 font-medium">Updated</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-100">
-                      {marketOverview.map((row) => (
-                        <tr key={row.metalType}>
-                          <td className="py-2 pr-4 capitalize font-semibold text-zinc-900">{row.metalType}</td>
-                          <td className="py-2 pr-4">
-                            <span className={cn(
-                              "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-tighter border",
-                              row.status === "live" ? "border-emerald-200 bg-emerald-50 text-emerald-700" :
-                              row.status === "stale" ? "border-amber-200 bg-amber-50 text-amber-700" :
-                              "border-rose-200 bg-rose-50 text-rose-700"
-                            )}>
-                              {row.status ?? "unknown"}
-                            </span>
-                          </td>
-                          <td className="py-2 pr-4 text-zinc-900">
-                            {row.latestPrice != null ? `$${fmt2(row.latestPrice)}` : "n/a"}
-                          </td>
-                          <td className={`py-2 pr-4 font-medium ${(row.change7dPct ?? 0) >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                            {fmtSignedPct(row.change7dPct)}
-                          </td>
-                          <td className={`py-2 pr-4 font-medium ${(row.change30dPct ?? 0) >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                            {fmtSignedPct(row.change30dPct)}
-                          </td>
-                          <td className="py-2 pr-4">
-                            <span className={`rounded-full border px-2 py-0.5 text-xs font-medium uppercase tracking-wide ${
-                              row.volatilityIndicator === "high"
-                                ? "border-rose-300 bg-rose-50 text-rose-700"
-                                : row.volatilityIndicator === "moderate"
-                                  ? "border-amber-300 bg-amber-50 text-amber-700"
-                                  : row.volatilityIndicator === "low"
-                                    ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                                    : "border-zinc-300 bg-zinc-50 text-zinc-600"
-                            }`}>
-                              {row.volatilityIndicator}
-                              {row.volatilityPct != null ? ` (${fmt2(row.volatilityPct)}%)` : ""}
-                            </span>
-                          </td>
-                          <td className="py-2 text-zinc-600">
-                            {row.latestTimestamp
-                              ? new Date(row.latestTimestamp).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-                              : "n/a"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="grid gap-8 lg:grid-cols-2">
+              <Card className="border-zinc-800 bg-zinc-900/30 backdrop-blur-sm"><CardHeader><div className="flex items-center justify-between"><CardTitle className="text-white font-bold tracking-tight">Market Overview</CardTitle><ClassificationLabel type="canonical" /></div></CardHeader><CardContent><div className="overflow-x-auto text-zinc-300"><table className="w-full text-sm"><thead><tr className="border-b border-zinc-800 text-left text-xs text-zinc-500 uppercase tracking-widest"><th className="pb-4 pr-4">Metal</th><th className="pb-4 pr-4">Status</th><th className="pb-4 pr-4">Spot ($/oz)</th><th className="pb-4 pr-4">7D Chg</th><th className="pb-4 pr-4">30D Chg</th><th className="pb-4">Vol</th></tr></thead><tbody className="divide-y divide-zinc-800">{marketOverview.map((row) => (<tr key={row.metalType} className="hover:bg-zinc-800/20 transition-colors"><td className="py-4 pr-4 capitalize font-bold text-white">{row.metalType}</td><td className="py-4 pr-4"><span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest border", row.status === "live" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : row.status === "stale" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-rose-500/30 bg-rose-500/10 text-rose-400")}>{row.status ?? "unknown"}</span></td><td className="py-4 pr-4 font-medium text-zinc-100">{row.latestPrice != null ? `$${fmt2(row.latestPrice)}` : "n/a"}</td><td className={`py-4 pr-4 font-bold ${(row.change7dPct ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{fmtSignedPct(row.change7dPct)}</td><td className={`py-4 pr-4 font-bold ${(row.change30dPct ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{fmtSignedPct(row.change30dPct)}</td><td className="py-4"><span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase", row.volatilityIndicator === "high" ? "border-rose-500/30 text-rose-400" : row.volatilityIndicator === "moderate" ? "border-amber-500/30 text-amber-400" : "border-emerald-500/30 text-emerald-400")}>{row.volatilityIndicator}</span></td></tr>))}</tbody></table></div></CardContent></Card>
+              <Card className="border-zinc-800 bg-zinc-900/30 backdrop-blur-sm"><CardHeader><div className="flex items-center justify-between"><CardTitle className="text-white font-bold tracking-tight">Focus Tags</CardTitle><ClassificationLabel type="canonical" /></div></CardHeader><CardContent><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-zinc-800 text-left text-xs text-zinc-500 uppercase tracking-widest"><th className="pb-4 pr-4">Tag</th><th className="pb-4 pr-4">Batches</th><th className="pb-4 pr-4">Net Value</th><th className="pb-4">ROI</th></tr></thead><tbody className="divide-y divide-zinc-800">{tagSummary.slice(0, 6).map((row) => (<tr key={row.id} className="hover:bg-zinc-800/20 transition-colors"><td className="py-4 pr-4"><span className="rounded-full border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-xs font-bold text-zinc-300">{row.name}</span></td><td className="py-4 pr-4 text-zinc-400">{row.batchCount}</td><td className="py-4 pr-4 text-zinc-100 font-bold">${fmt2(row.totalNetValue)}</td><td className={`py-4 font-bold ${row.totalProfitLoss >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{row.totalProfitLoss >= 0 ? "+" : ""}${fmt2(row.totalProfitLoss)}</td></tr>))}</tbody></table></div></CardContent></Card>
+            </div>
 
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Forecast Overview</CardTitle>
-                    <CardDescription>
-                      Deterministic server-side projections across metals with SMA, EMA, regression, and confidence.
-                    </CardDescription>
-                  </div>
-                  <ClassificationLabel type="statistical" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-zinc-200 text-left text-xs text-zinc-500">
-                        <th className="pb-2 pr-4 font-medium">Metal</th>
-                        <th className="pb-2 pr-4 font-medium">Latest</th>
-                        <th className="pb-2 pr-4 font-medium">Projected</th>
-                        <th className="pb-2 pr-4 font-medium">Method</th>
-                        <th className="pb-2 pr-4 font-medium">SMA</th>
-                        <th className="pb-2 pr-4 font-medium">EMA</th>
-                        <th className="pb-2 pr-4 font-medium">Regression</th>
-                        <th className="pb-2 pr-4 font-medium">Confidence</th>
-                        <th className="pb-2 font-medium">Trend</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-100">
-                      {forecastOverview.map((row) => {
-                        const trendPath = buildSparklinePath(
-                          row.curve.map((point) => point.projectedPriceUsdPerUnit),
-                          120,
-                          32,
-                        );
+            <Card className="border-zinc-800 bg-zinc-900/30 backdrop-blur-sm"><CardHeader><div className="flex items-center justify-between"><CardTitle className="text-white font-bold tracking-tight">Forecast Engine</CardTitle><ClassificationLabel type="statistical" /></div></CardHeader><CardContent><div className="overflow-x-auto text-zinc-300"><table className="w-full text-sm"><thead><tr className="border-b border-zinc-800 text-left text-xs text-zinc-500 uppercase tracking-widest"><th className="pb-4 pr-4">Metal</th><th className="pb-4 pr-4">Method</th><th className="pb-4 pr-4">Projected</th><th className="pb-4 pr-4">Confidence</th><th className="pb-4 text-right">Trend</th></tr></thead><tbody className="divide-y divide-zinc-800">{forecastOverview.map((row) => { const trendPath = buildSparklinePath(row.curve.map(p => p.projectedPriceUsdPerUnit), 100, 24); return (<tr key={row.metalType} className="hover:bg-zinc-800/20 transition-colors"><td className="py-4 pr-4 capitalize font-bold text-white">{row.metalType}</td><td className="py-4 pr-4 text-zinc-500 uppercase font-bold text-[10px]">{formatProjectionMethod(row.method as ProjectionMethod)}</td><td className="py-4 pr-4 font-bold text-cyan-400">{row.projectedPrice != null ? `$${fmt2(row.projectedPrice)}` : "n/a"}</td><td className="py-4 pr-4"><span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase", row.confidenceIndicator === "high" ? "border-emerald-500/30 text-emerald-400" : "border-rose-500/30 text-rose-400")}>{row.confidenceIndicator}</span></td><td className="py-4 text-right">{trendPath ? (<svg viewBox="0 0 100 24" className="h-6 w-24 ml-auto"><path d={trendPath} fill="none" stroke="currentColor" strokeWidth="2" className="text-cyan-500/50" /></svg>) : (<span className="text-zinc-600">n/a</span>)}</td></tr>); })}</tbody></table></div></CardContent></Card>
 
-                        return (
-                          <tr key={row.metalType}>
-                            <td className="py-2 pr-4 capitalize text-zinc-900">{row.metalType}</td>
-                            <td className="py-2 pr-4 text-zinc-900">
-                              {row.latestPrice != null ? `$${fmt2(row.latestPrice)}` : "n/a"}
-                            </td>
-                            <td className="py-2 pr-4 text-zinc-900">
-                              {row.projectedPrice != null ? `$${fmt2(row.projectedPrice)}` : "n/a"}
-                            </td>
-                            <td className="py-2 pr-4 text-zinc-900">{formatProjectionMethod(row.method as ProjectionMethod)}</td>
-                            <td className="py-2 pr-4 text-zinc-900">
-                              {row.smaProjectedPrice != null ? `$${fmt2(row.smaProjectedPrice)}` : "n/a"}
-                            </td>
-                            <td className="py-2 pr-4 text-zinc-900">
-                              {row.emaProjectedPrice != null ? `$${fmt2(row.emaProjectedPrice)}` : "n/a"}
-                            </td>
-                            <td className="py-2 pr-4 text-zinc-900">
-                              {row.regressionProjectedPrice != null ? `$${fmt2(row.regressionProjectedPrice)}` : "n/a"}
-                            </td>
-                            <td className="py-2 pr-4">
-                              <span className={`rounded-full border px-2 py-0.5 text-xs font-medium uppercase tracking-wide ${
-                                row.confidenceIndicator === "high"
-                                  ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                                  : row.confidenceIndicator === "moderate"
-                                    ? "border-amber-300 bg-amber-50 text-amber-700"
-                                    : row.confidenceIndicator === "low"
-                                      ? "border-rose-300 bg-rose-50 text-rose-700"
-                                      : "border-zinc-300 bg-zinc-50 text-zinc-600"
-                              }`}>
-                                {row.confidenceIndicator}
-                                {row.volatilityPct != null ? ` (${fmt2(row.volatilityPct)}% vol)` : ""}
-                              </span>
-                            </td>
-                            <td className="py-2">
-                              {trendPath ? (
-                                <svg viewBox="0 0 120 32" className="h-8 w-28" role="img" aria-label={`${row.metalType} forecast trend`}>
-                                  <path d={trendPath} fill="none" stroke="currentColor" strokeWidth="2" className="text-violet-600" />
-                                </svg>
-                              ) : (
-                                <span className="text-zinc-500">n/a</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="grid gap-8 lg:grid-cols-2">
+              <Card className="border-amber-900/30 bg-amber-900/5"><CardHeader><div className="flex items-center justify-between"><CardTitle className="text-amber-200 font-bold">Investigation Queue</CardTitle><span className="rounded-full bg-amber-500/20 px-3 py-1 text-[10px] font-bold text-amber-400 uppercase tracking-widest">{recentInvestigations.filter((i: any) => i.status !== "resolved").length} Active Discrepancies</span></div></CardHeader><CardContent><div className="overflow-x-auto"><table className="w-full text-xs text-amber-100"><thead><tr className="border-b border-amber-900/50 text-left text-zinc-500 uppercase tracking-widest"><th className="pb-4 pr-4">Case Title</th><th className="pb-4 pr-4">Severity</th><th className="pb-4">Status</th></tr></thead><tbody className="divide-y divide-amber-900/30">{recentInvestigations.slice(0, 4).map((i: any) => (<tr key={i.id} className="hover:bg-amber-900/10"><td className="py-4 pr-4 font-bold"><Link href={`/investigations/${i.id}`} className="hover:underline">{i.title}</Link></td><td className="py-4 pr-4"><span className={cn("rounded-full px-2 py-0.5 text-[8px] font-bold uppercase border", i.severity === "critical" ? "border-rose-500/50 bg-rose-500/10 text-rose-400" : "border-amber-500/50 bg-amber-500/10 text-amber-400")}>{i.severity}</span></td><td className="py-4 capitalize italic text-amber-400/70">{i.status.replace(/_/g, " ")}</td></tr>))}</tbody></table></div></CardContent></Card>
+              <Card className="border-zinc-800 bg-zinc-900/30 backdrop-blur-sm"><CardHeader><CardTitle className="text-white">Recent Artifacts</CardTitle></CardHeader><CardContent><p className="text-xs text-zinc-500 italic mb-4 text-center">No reports generated in this filter window.</p></CardContent></Card>
+            </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Tags</CardTitle>
-                <CardDescription>Batch count and economic totals grouped by tag.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {tagSummary.length === 0 ? (
-                  <p className="text-sm text-zinc-500">No tagged batches found for the current filter set.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-zinc-200 text-left text-xs text-zinc-500">
-                          <th className="pb-2 pr-4 font-medium">Tag</th>
-                          <th className="pb-2 pr-4 font-medium">Batch Count</th>
-                          <th className="pb-2 pr-4 font-medium">Total Net Value</th>
-                          <th className="pb-2 font-medium">Total Profit / Loss</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-100">
-                        {tagSummary.map((row) => (
-                          <tr key={row.id}>
-                            <td className="py-2 pr-4">
-                              <span
-                                className="rounded-full border border-zinc-300 bg-white px-2 py-0.5 text-xs text-zinc-700"
-                               
-                              >
-                                {row.name}
-                              </span>
-                            </td>
-                            <td className="py-2 pr-4 text-zinc-900">{row.batchCount}</td>
-                            <td className="py-2 pr-4 text-zinc-900">${fmt2(row.totalNetValue)}</td>
-                            <td className={`py-2 font-medium ${row.totalProfitLoss >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                              {row.totalProfitLoss >= 0 ? "+" : ""}${fmt2(row.totalProfitLoss)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <CardTitle>Scheduled Reports</CardTitle>
-                    <CardDescription>
-                      Automated report delivery queues and execution status.
-                    </CardDescription>
-                  </div>
-                  <Link
-                    href="/reports/schedules"
-                    className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-xs font-medium text-zinc-900 hover:bg-zinc-50"
-                  >
-                    Manage Schedules
-                  </Link>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {scheduledReports.length === 0 ? (
-                  <p className="text-sm text-zinc-500">No schedules configured.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-zinc-200 text-left text-xs text-zinc-500">
-                          <th className="pb-2 pr-4 font-medium">Type</th>
-                          <th className="pb-2 pr-4 font-medium">Batch</th>
-                          <th className="pb-2 pr-4 font-medium">Cadence</th>
-                          <th className="pb-2 pr-4 font-medium">Next Run</th>
-                          <th className="pb-2 font-medium">Last Run</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-100">
-                        {scheduledReports.slice(0, 8).map((schedule) => (
-                          <tr key={schedule.id}>
-                            <td className="py-2 pr-4 capitalize text-zinc-900">
-                              {schedule.type}
-                              {schedule.isPaused ? " (paused)" : ""}
-                            </td>
-                            <td className="py-2 pr-4 text-zinc-700">
-                              {schedule.batchId ? (
-                                <Link href={`/batches/${schedule.batchId}`} className="text-cyan-700 hover:text-cyan-900">
-                                  {schedule.batchId.slice(0, 8)}...
-                                </Link>
-                              ) : (
-                                "summary"
-                              )}
-                            </td>
-                            <td className="py-2 pr-4 text-zinc-700">{schedule.cadence}</td>
-                            <td className="py-2 pr-4 text-zinc-700">
-                              {new Date(schedule.nextRunAt).toLocaleString("en-US", {
-                                dateStyle: "medium",
-                                timeStyle: "short",
-                              })}
-                            </td>
-                            <td className="py-2 text-zinc-700">
-                              {schedule.lastRunAt
-                                ? new Date(schedule.lastRunAt).toLocaleString("en-US", {
-                                    dateStyle: "medium",
-                                    timeStyle: "short",
-                                  })
-                                : "never"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Reports</CardTitle>
-                <CardDescription>
-                  Most recently generated customer-facing report documents.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {recentReports.length === 0 ? (
-                  <p className="text-sm text-zinc-500">No reports generated yet.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-zinc-200 text-left text-xs text-zinc-500">
-                          <th className="pb-2 pr-4 font-medium">Type</th>
-                          <th className="pb-2 pr-4 font-medium">Batch</th>
-                          <th className="pb-2 font-medium">Generated At</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-100">
-                        {recentReports.map((report) => (
-                          <tr key={report.id}>
-                            <td className="py-2 pr-4 capitalize text-zinc-900">{report.type}</td>
-                            <td className="py-2 pr-4">
-                              {report.batchId ? (
-                                <Link href={`/batches/${report.batchId}`} className="text-cyan-700 hover:text-cyan-900">
-                                  {report.batchId.slice(0, 8)}...
-                                </Link>
-                              ) : (
-                                <span className="text-zinc-500">summary</span>
-                              )}
-                            </td>
-                            <td className="py-2 text-zinc-600">
-                              {new Date(report.createdAt).toLocaleString("en-US", {
-                                dateStyle: "medium",
-                                timeStyle: "short",
-                              })}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="border-amber-100 bg-amber-50/20">
-              <CardHeader>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <CardTitle className="text-amber-900">Active Investigations</CardTitle>
-                    <CardDescription className="text-amber-700">
-                      High-priority audit discrepancies and sovereign trust alerts.
-                    </CardDescription>
-                  </div>
-                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
-                    {recentInvestigations.filter((i) => i.status !== "resolved").length} Active
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {recentInvestigations.length === 0 ? (
-                  <p className="text-sm text-zinc-500">No investigations active.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-amber-200 text-left text-xs text-amber-600">
-                          <th className="pb-2 pr-4 font-medium uppercase tracking-wider">Title</th>
-                          <th className="pb-2 pr-4 font-medium uppercase tracking-wider">Severity</th>
-                          <th className="pb-2 pr-4 font-medium uppercase tracking-wider">Status</th>
-                          <th className="pb-2 font-medium uppercase tracking-wider">Batches</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-amber-100">
-                        {recentInvestigations.slice(0, 5).map((inv) => (
-                          <tr key={inv.id} className="group hover:bg-white/50 transition-colors">
-                            <td className="py-3 pr-4">
-                              <Link 
-                                href={`/investigations/${inv.id}`}
-                                className="font-semibold text-amber-900 hover:text-amber-600 transition-colors"
-                              >
-                                {inv.title}
-                              </Link>
-                            </td>
-                            <td className="py-3 pr-4">
-                              <span className={cn(
-                                "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase border",
-                                inv.severity === "critical" ? "bg-rose-100 border-rose-200 text-rose-700" :
-                                inv.severity === "high" ? "bg-orange-100 border-orange-200 text-orange-700" :
-                                "bg-zinc-100 border-zinc-200 text-zinc-700"
-                              )}>
-                                {inv.severity}
-                              </span>
-                            </td>
-                            <td className="py-3 pr-4 capitalize text-amber-800">{inv.status.replace(/_/g, " ")}</td>
-                            <td className="py-3 text-amber-700">
-                              {inv.linkedBatches?.length ?? 0}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <section className="space-y-4">
+            <section className="space-y-6 pt-4 border-t border-zinc-900">
+              <div className="flex items-center justify-between"><h2 className="text-2xl font-bold italic tracking-tight text-white uppercase tracking-widest text-xs opacity-50">Industrial Analytics Suite</h2><div className="h-px flex-1 bg-zinc-900 mx-8 hidden lg:block" /></div>
               <PerformanceHeatmap data={heatmapPoints} />
-              
-              <header>
-                <h2 className="text-xl font-semibold tracking-tight text-zinc-900">
-                  Performance Over Time
-                </h2>
-                <p className="text-sm text-zinc-600">
-                  Chart-ready time-series datasets prepared for future chart integrations.
-                </p>
-              </header>
-              <div className="grid gap-4 lg:grid-cols-2">
-                <RoiTrend
-                  monthlySeries={chartData.monthlySeries}
-                  cumulativeProfitLossSeries={chartData.cumulativeProfitLossSeries}
-                  recoveryRateTrendSeries={chartData.recoveryRateTrendSeries}
-                />
+              <div className="grid gap-6 lg:grid-cols-2">
+                <RoiTrend monthlySeries={chartData.monthlySeries} cumulativeProfitLossSeries={chartData.cumulativeProfitLossSeries} recoveryRateTrendSeries={chartData.recoveryRateTrendSeries} />
                 <MetalPerformanceTrend metalTypeSeries={chartData.metalTypeSeries} />
               </div>
+              <MonthlySummary rows={monthlySummary} />
+              <MetalBreakdownTable rows={metalBreakdown} />
             </section>
-
-            <MonthlySummary rows={monthlySummary} />
-
-            <MetalBreakdownTable rows={metalBreakdown} />
-          </>
+          </div>
         )}
       </section>
     </main>
   );
 }
-

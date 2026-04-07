@@ -74,7 +74,7 @@ export default async function YardDashboardPage() {
                Waiting for load...
             </div>
           ) : (
-            activeTickets.map(ticket => (
+            activeTickets.map((ticket: any) => (
               <div key={ticket.id} className="bg-slate-900 border-4 border-slate-800 rounded-[40px] p-8 flex justify-between items-center hover:border-amber-500/50 transition-colors cursor-pointer group">
                 <div className="flex items-center gap-8">
                   {/* Ticket Badge */}

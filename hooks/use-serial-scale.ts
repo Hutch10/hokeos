@@ -31,8 +31,7 @@ export function useSerialScale() {
     setError(null);
 
     try {
-      // @ts-ignore - WebSerial is not in default lib.dom
-      const p = await navigator.serial.requestPort();
+      const p = await (navigator as any).serial.requestPort();
       
       // Standard industrial scale defaults: 9600 baud, 8 bits, no parity, 1 stop bit
       await p.open({ baudRate: 9600 });
@@ -77,7 +76,8 @@ export function useSerialScale() {
         reader = port.readable.getReader();
         try {
           while (true) {
-            const { value, done } = await reader.read();
+            if (!reader) break;
+            const { value, done } = await (reader as any).read();
             if (done) break;
 
             const chunk = new TextDecoder().decode(value);
@@ -131,7 +131,7 @@ export function useSerialScale() {
     return () => {
       keepReading = false;
       if (reader) {
-        reader.cancel().catch(e => console.error("Error canceling reader:", e));
+        (reader as any).cancel().catch((e: any) => console.error("Error canceling reader:", e));
       }
     };
   }, [port, isConnected]);

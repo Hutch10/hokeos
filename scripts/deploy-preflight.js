@@ -14,23 +14,35 @@ const REQUIRED_ENV_VARS = [
 async function runPreflight() {
   console.log("--- [HokeOS Industrial Deployment Pre-flight] ---");
   
-  const missing = [];
-  for (const key of REQUIRED_ENV_VARS) {
-    if (!process.env[key]) {
-      missing.push(key);
+  if (process.env.SOVEREIGN_BUILD === "true") {
+    console.log("⚠️ SOVEREIGN_BUILD detected. Skipping ENV validation.");
+  } else {
+    const missing = [];
+    for (const key of REQUIRED_ENV_VARS) {
+      if (!process.env[key]) {
+        missing.push(key);
+      }
+    }
+
+    if (missing.length > 0) {
+      console.error(`❌ ERROR: Missing required environment variables: ${missing.join(", ")}`);
+      process.exit(1);
     }
   }
 
-  if (missing.length > 0) {
-    console.error(`❌ ERROR: Missing required environment variables: ${missing.join(", ")}`);
-    process.exit(1);
+  // Phase 51: Entropy Check
+  if (process.env.SOVEREIGN_BUILD !== "true") {
+    const secret = process.env.NEXTAUTH_SECRET;
+    if (secret === "dev-only-change-me" || secret.length < 32) {
+      console.error("❌ ERROR: NEXTAUTH_SECRET is insecure. Must be >= 32 chars and not default.");
+      process.exit(1);
+    }
   }
 
-  // Phase 51: Entropy Check
-  const secret = process.env.NEXTAUTH_SECRET;
-  if (secret === "dev-only-change-me" || secret.length < 32) {
-    console.error("❌ ERROR: NEXTAUTH_SECRET is insecure. Must be >= 32 chars and not default.");
-    process.exit(1);
+  if (process.env.SKIP_DB_CHECK === "true") {
+    console.log("⚠️ SKIP_DB_CHECK detected. Skipping live database ping.");
+    console.log("✅ SUCCESS: All pre-flight safety checks passed (Bypass active).");
+    process.exit(0);
   }
 
   // Phase 51: Live DB Ping

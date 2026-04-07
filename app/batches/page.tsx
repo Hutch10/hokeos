@@ -55,7 +55,7 @@ export default async function BatchesPage({
   let tags: { id: string; name: string; color: string | null }[] = [];
 
   try {
-    tags = await tagService.listTags(user.id, user.activeTeamId);
+    tags = await tagService.listTags(user.activeTeamId);
     const rawBatches = await batchService.listBatches(user.id, { tagIds: selectedTagIds });
     const parsedBatches: BatchApiData[] = [];
 
@@ -113,7 +113,7 @@ export default async function BatchesPage({
                 <p className="text-sm text-zinc-500">No tags yet. Add tags from calculator or edit batch flow.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  {tags.map((tag) => {
+                  {tags.map((tag: any) => {
                     const checked = selectedTagIds.includes(tag.id);
                     return (
                       <label
@@ -194,7 +194,7 @@ export default async function BatchesPage({
               </Card>
             )}
 
-            {batches.map((batch) => {
+            {batches.map((batch: any) => {
               const items = batch.items ?? [];
               const totalGrossValue = batch.totalGrossValue ?? 0;
               const totalNetValue = batch.totalNetValue ?? 0;
@@ -278,7 +278,7 @@ export default async function BatchesPage({
 
                     {batch.tags && batch.tags.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
-                        {batch.tags.map((tag) => (
+                        {batch.tags.map((tag: any) => (
                           <span
                             key={tag.id}
                             className="rounded-full border border-zinc-300 bg-white px-2 py-0.5 text-xs text-zinc-700"

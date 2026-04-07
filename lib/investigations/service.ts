@@ -82,7 +82,7 @@ export async function listInvestigations(teamId: string): Promise<InvestigationR
     .where(eq(investigations.teamId, teamId))
     .orderBy(desc(investigations.createdAt));
 
-  return rows.map((row) => ({
+  return (rows as any[]).map((row) => ({
     ...row,
     evidenceJson: row.evidenceJson as Record<string, unknown> | null,
     linkedBatches: [] as { id: string; status: string; trustScore: string | null }[],

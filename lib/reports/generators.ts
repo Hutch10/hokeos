@@ -276,16 +276,23 @@ async function buildReport(batch: BatchApiData, type: ReportType): Promise<Gener
       );
     }
 
-    if (type === "settlement") {
-      const fingerprint = calculateFingerprint(batch.auditSnapshot);
+    const fingerprint = calculateFingerprint(batch);
 
-      doc.moveDown(2);
+    doc.moveDown(2);
+    doc.fontSize(8).text("-".repeat(120), { width: PAGE_WIDTH });
+    doc.fontSize(10);
+    doc.text(`CERTIFICATE OF INTEGRITY: ${fingerprint}`);
+    doc.fontSize(8);
+    doc.text("VERIFIED BY HOKEOS SENTINEL | SHA-256 ENCRYPTED AUDIT TRACE | IMMUTABLE SETTLEMENT DATA", { width: PAGE_WIDTH });
+    doc.moveDown();
+
+    if (type === "settlement") {
+      doc.moveDown();
       sectionTitle(doc, "Trust-Layer Audit Certification");
       kv(doc, "Confidence Score", `${batch.auditSnapshot?.confidence?.score ?? 100}%`);
       kv(doc, "Confidence Level", batch.auditSnapshot?.confidence?.level?.toUpperCase() ?? "HIGH");
       kv(doc, "Degraded Mode", batch.auditSnapshot?.confidence?.degradedMode ? "YES" : "NO");
-      kv(doc, "HokeOS Version", "v1.4.0-industrial");
-      kv(doc, "Integrity Hash (SHA-256)", fingerprint);
+      kv(doc, "HokeOS Vers.", "v1.6.1-industrial");
 
       doc.moveDown();
       doc.fontSize(8).text(

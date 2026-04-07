@@ -1,3 +1,4 @@
+// @ts-expect-error uuid is missing types in the build environment
 import { v4 as uuidv4 } from "uuid";
 
 /**

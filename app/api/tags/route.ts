@@ -16,7 +16,7 @@ export async function GET() {
       return Response.json({ ok: false, error: "Authentication required" }, { status: 401 });
     }
 
-    const tags = await listTags(user.id, user.activeTeamId);
+    const tags = await listTags(user.activeTeamId);
     return Response.json({ ok: true, data: tags });
   } catch (err) {
     console.error("[GET /api/tags] error:", err);
